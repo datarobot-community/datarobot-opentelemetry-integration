@@ -39,7 +39,7 @@ pipeline:
               automountServiceAccountToken: true
               nodeSelector: {}
               os: Linux
-                      - stage:
+    - stage:
             name: Build Docker Image CI
             identifier: Build_Docker_Image
             description: ""
