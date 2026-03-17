@@ -1,0 +1,159 @@
+pipeline:
+  name: CI
+  identifier: CI
+  projectIdentifier: datarobotopentelemetry
+  orgIdentifier: MMM
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.svc_harness_git1
+        repoName: datarobot-opentelemetry
+        build: <+input>
+  stages:
+    - stage:
+        name: Git Hash
+        identifier: Git_Hash
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Git Hash
+                  identifier: Git_Hash
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/git
+                    shell: Sh
+                    command: export GIT_HASH_SHORT=$(git rev-parse --short HEAD)
+                    outputVariables:
+                      - name: GIT_HASH_SHORT
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+    - parallel:
+        - stage:
+            name: Linting
+            identifier: CI
+            type: CI
+            spec:
+              cloneCodebase: true
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: account.cigeneral
+                  namespace: harness-delegate-ng
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  os: Linux
+              execution:
+                steps:
+                  - parallel:
+                      - step:
+                          type: Run
+                          name: Ruff Linting
+                          identifier: Ruff_Linting
+                          spec:
+                            connectorRef: account.dockerhub_datarobot_read
+                            image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            shell: Sh
+                            command: |-
+                              echo "TODO Add Ruff Linting"
+                      - step:
+                          type: Run
+                          name: Ruff Formatting
+                          identifier: Black_Linting
+                          spec:
+                            connectorRef: account.dockerhub_datarobot_read
+                            image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            shell: Sh
+                            command: |-
+                              echo "TODO Add Ruff Formatting"
+                      - step:
+                          type: Run
+                          name: Run Mypy
+                          identifier: Run_Mypy
+                          spec:
+                            connectorRef: account.dockerhub_datarobot_read
+                            image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            shell: Sh
+                            command: |-
+                              echo "TODO Add Mypy"
+              caching:
+                enabled: false
+                paths: []
+        - stage:
+            name: Unit Test
+            identifier: Unit_Test
+            type: CI
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
+                  - step:
+                      type: Run
+                      name: Run Unit Test
+                      identifier: Run_Unit_Test
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        shell: Sh
+                        command: |-
+                          echo "TODO Add Unit Test"
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths:
+                              - /harness/test_results/unit-test-results.xml
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: account.cigeneral
+                  namespace: harness-delegate-ng
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  os: Linux
+              caching:
+                enabled: false
+                paths: []
+        - stage:
+            name: Source Code License Check
+            identifier: License_Check
+            type: CI
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
+                  - step:
+                      type: Run
+                      name: License Check
+                      identifier: License_Check
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: ghcr.io/apache/skywalking-eyes/license-eye
+                        shell: Sh
+                        command: |-
+                          echo "Run License Check"
+                          license-eye -v info -c .licenserc.yaml header check
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: account.cigeneral
+                  namespace: harness-delegate-ng
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  os: Linux
+              caching:
+                enabled: false
+                paths: []
+              slsa_provenance:
+                enabled: false
+            description: ""

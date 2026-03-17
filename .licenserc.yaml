@@ -1,0 +1,56 @@
+# Configuration for the copyright headers added to source code files in the repo. Used by the skywalking-eyes tool.
+# See dev-docs/docs/developer_guide/workflows/copyright.md for details.
+# Also, additional syntax options for this configuration file that are supported by the tool are
+# described in the tool's own documentation here: https://github.com/apache/skywalking-eyes.
+#
+# USAGE
+# -------
+# To check files:
+#    > docker run  --rm -v $(pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye:785bb7f3810572d6912666b4f64bad28e4360799 -v info -c .licenserc.yaml header check
+# To fix files automatically:
+#    > docker run  --rm -v $(pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye:785bb7f3810572d6912666b4f64bad28e4360799 -v info -c .licenserc.yaml header fix
+#
+header:
+  license:
+    spdx-id: N/A
+    copyright-owner: N/A
+    content: |-
+
+      Copyright 2026 DataRobot, Inc. and its affiliates.
+
+      All rights reserved.
+
+      DataRobot, Inc. Confidential.
+
+      This is unpublished proprietary source code of DataRobot, Inc.
+      and its affiliates.
+
+      The copyright notice above does not evidence any actual or intended
+      publication of such source code.
+    pattern: |-
+
+      Copyright [0-9]{4} DataRobot, Inc\. and its affiliates\.
+
+      All rights reserved\.
+
+      DataRobot, Inc\. Confidential\.
+
+      This is unpublished proprietary source code of DataRobot, Inc\.
+      and its affiliates\.
+
+      The copyright notice above does not evidence any actual or intended
+      publication of such source code\.
+
+  paths:
+    - '**/*.py'
+
+  paths-ignore:
+    # these files/directories should not be analyzed
+    #
+    - '.licenserc.yaml'
+    - 'env'
+    - '__init__.py'
+    - '**/*_pb2.py'
+    - '**/*_pb2_grpc.py'
+
+  comment: on-failure
