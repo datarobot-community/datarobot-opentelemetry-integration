@@ -53,7 +53,7 @@ pipeline:
                   name: Build and Push Image
                   identifier: Build_and_Push_Image
                   spec:
-                    connectorRef: mmmdockerhubwrite2
+                    connectorRef: org.mmmdockerhubwriteorg
                     repo: datarobotdev/datarobotopentelemetry
                     tags:
                       - ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
