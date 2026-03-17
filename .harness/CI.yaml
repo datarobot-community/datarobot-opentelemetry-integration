@@ -39,6 +39,46 @@ pipeline:
               automountServiceAccountToken: true
               nodeSelector: {}
               os: Linux
+                      - stage:
+            name: Build Docker Image CI
+            identifier: Build_Docker_Image
+            description: ""
+            type: CI
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
+                  - step:
+                      type: BuildAndPushDockerRegistry
+                      name: Build and Push Image
+                      identifier: Build_and_Push_Image
+                      spec:
+                        connectorRef: mmmdockerhubwrite2
+                        repo: datarobotdev/datarobotopentelemetry
+                        tags:
+                          - ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        dockerfile: ci.Dockerfile
+                        optimize: true
+                        remoteCacheRepo: datarobotdev/datarobotopentelemetry
+                        resources:
+                          limits:
+                            memory: 1Gi
+                            cpu: "1"
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: account.cigeneral
+                  namespace: harness-delegate-ng
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  containerSecurityContext:
+                    privileged: false
+                  os: Linux
+              caching:
+                enabled: false
+                paths: []
+              slsa_provenance:
+                enabled: false
     - parallel:
         - stage:
             name: Linting
@@ -144,13 +184,7 @@ pipeline:
                           echo "Run License Check"
                           license-eye -v info -c .licenserc.yaml header check
               infrastructure:
-                type: KubernetesDirect
-                spec:
-                  connectorRef: account.cigeneral
-                  namespace: harness-delegate-ng
-                  automountServiceAccountToken: true
-                  nodeSelector: {}
-                  os: Linux
+                useFromStage: Build_Docker_Image
               caching:
                 enabled: false
                 paths: []
