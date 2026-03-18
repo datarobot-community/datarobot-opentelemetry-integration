@@ -1,0 +1,14 @@
+[project]
+name = "datarobot-opentelemetry"
+version = "0.1.0"
+description = "OpenTelemetry semantic conventions and helper utilities for DataRobot."
+readme = "README.md"
+authors = [
+    { name = "Taras Nek", email = "taras.nek@datarobot.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
