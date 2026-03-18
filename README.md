@@ -1,10 +1,9 @@
 # datarobot-opentelemetry
 
-This package provides OpenTelemetry semantic conventions and helper utilities used by DataRobot for telemetry collection.
 
 ## Overview
 
-TODO: Add a short project overview, including supported use cases and scope.
+This package provides OpenTelemetry semantic conventions and helper utilities used by DataRobot for telemetry collection.
 
 ## Requirements
 
