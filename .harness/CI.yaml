@@ -54,12 +54,12 @@ pipeline:
                   identifier: Build_and_Push_Image
                   spec:
                     connectorRef: org.mmmdockerhubwriteorg
-                    repo: datarobotdev/datarobotopentelemetry
+                    repo: datarobotdev/datarobot-opentelemetry
                     tags:
                       - ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                     dockerfile: ci.Dockerfile
                     optimize: true
-                    remoteCacheRepo: datarobotdev/datarobotopentelemetry
+                    remoteCacheRepo: datarobotdev/datarobot-opentelemetry
                     resources:
                       limits:
                         memory: 1Gi
@@ -103,7 +103,7 @@ pipeline:
                           identifier: Ruff_Linting
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
                               echo "TODO Add Ruff Linting"
@@ -144,7 +144,7 @@ pipeline:
                       identifier: Run_Unit_Test
                       spec:
                         connectorRef: account.dockerhub_datarobot_read
-                        image: datarobotdev/datarobotopentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                         shell: Sh
                         command: |-
                           echo "TODO Add Unit Test"
