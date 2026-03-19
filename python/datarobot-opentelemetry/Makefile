@@ -1,4 +1,4 @@
-DEFAULT_GOAL := help
+.DEFAULT_GOAL := help
 .PHONY: help
 help:
 	@echo "====================="
@@ -10,7 +10,7 @@ APP_PACKAGES ?= src/datarobot_opentelemetry
 TESTS ?= .
 
 .PHONY: ci
-ci: test-ruff test-black mypy license-check test ## Runs all the CICD checks
+ci: test-ruff test-black mypy license-check test ## Runs all CI checks including tests
 
 ########################################
 ##@ Lint
@@ -65,8 +65,8 @@ lib-license-check: ## Checks all dependencies have only approved licenses
 unit-test: ## Runs unit tests
 	@uv run pytest -svvv tests/unit
 
-.PHONY: test ## Run all tests, currently only unit tests but can be extended to include integration tests, etc.
-test: unit-test 
+.PHONY: test
+test: unit-test ## Run all tests
 
 .PHONY: cov
 cov: ## Runs code tests with code coverage
