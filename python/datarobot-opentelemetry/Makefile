@@ -6,7 +6,6 @@ help:
 	@echo "====================="
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-APP_PACKAGES ?= src/datarobot_opentelemetry
 TESTS ?= .
 
 .PHONY: ci
@@ -20,30 +19,30 @@ lint: test-ruff test-black mypy ## Runs linting targets
 .PHONY: ruff
 ruff: ## Run ruff with fix
 	@echo "🧹 Linting with ruff.."
-	@uv run ruff check --fix $(APP_PACKAGES)
+	@uv run ruff check --fix src
 
 .PHONY: test-ruff
 test-ruff: ## Run ruff checks
-	@uv run ruff check $(APP_PACKAGES)
+	@uv run ruff check src
 
 .PHONY: black
 black: ## Run black linting
 	@echo "🧹 Linting with black.."
-	@uv run ruff format $(APP_PACKAGES)
+	@uv run ruff format src
 
 .PHONY: test-black
 test-black: ## Run black checks
-	@uv run ruff format --check $(APP_PACKAGES)
+	@uv run ruff format --check src
 
 .PHONY: fmt
 fmt: black  ## Reformats changed code
 	@echo "Running code formatters"
-	@uv run ruff check --select I --fix $(APP_PACKAGES)
+	@uv run ruff check --select I --fix src
 
 .PHONY: mypy
 mypy: ## Run mypy checks
 	@echo "🧹 Linting with mypy.."
-	@uv run mypy --pretty --strict $(APP_PACKAGES)
+	@uv run mypy --pretty --strict src
 
 ########################################
 ##@ Licenses
