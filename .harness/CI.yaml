@@ -155,7 +155,7 @@ pipeline:
                         command: |-
                           echo "Run Unit Test"
                           cd python/datarobot-opentelemetry
-                          uv run --no-sync pytest -svvv tests/unit --junitxml=/tmp/unit-test-results.xml
+                          uv run --no-sync pytest -svvv tests/unit --junitxml=/harness/test_results/unit-test-results.xml
                         reports:
                           type: JUnit
                           spec:
