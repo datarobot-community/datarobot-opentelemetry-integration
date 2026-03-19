@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "OpenTelemetry utilities and encapsulation of semantic naming conventions for improved integration with DataRobot."
 readme = "README.md"
 authors = [
-    { name = "DataRobot", email = "taras.nek@datarobot.com" }
+    { name = "DataRobot", email = "support@datarobot.com" }
 ]
 requires-python = ">=3.12"
 dependencies = []
@@ -12,3 +12,10 @@ dependencies = []
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "ruff>=0.15.6",
+]

@@ -56,8 +56,8 @@ pipeline:
                     connectorRef: org.mmmdockerhubwriteorg
                     repo: datarobotdev/datarobot-opentelemetry
                     tags:
-                      - ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
-                    dockerfile: ci.Dockerfile
+                      - ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                    dockerfile: ci-python.Dockerfile
                     optimize: true
                     remoteCacheRepo: datarobotdev/datarobot-opentelemetry
                     resources:
@@ -106,7 +106,9 @@ pipeline:
                             image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Ruff Linting"
+                              echo "Run Ruff Linting"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync ruff src
                       - step:
                           type: Run
                           name: Ruff Formatting
@@ -116,7 +118,9 @@ pipeline:
                             image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Ruff Formatting"
+                              echo "Run Ruff Formatting"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync ruff format src
                       - step:
                           type: Run
                           name: Run Mypy
@@ -126,7 +130,9 @@ pipeline:
                             image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Mypy"
+                              echo "Run Mypy"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync mypy --pretty --strict src
               caching:
                 enabled: false
                 paths: []
@@ -147,7 +153,9 @@ pipeline:
                         image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                         shell: Sh
                         command: |-
-                          echo "TODO Add Unit Test"
+                          echo "Run Unit Test"
+                          cd python/datarobot-opentelemetry
+                          uv run --no-sync pytest -svvv tests/unit --junitxml=/tmp/unit-test-results.xml
                         reports:
                           type: JUnit
                           spec:
