@@ -103,7 +103,7 @@ pipeline:
                           identifier: Ruff_Linting
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
                               echo "Run Ruff Linting"
@@ -115,7 +115,7 @@ pipeline:
                           identifier: Black_Linting
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
                               echo "Run Ruff Formatting"
@@ -127,7 +127,7 @@ pipeline:
                           identifier: Run_Mypy
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
                               echo "Run Mypy"
@@ -150,7 +150,7 @@ pipeline:
                       identifier: Run_Unit_Test
                       spec:
                         connectorRef: account.dockerhub_datarobot_read
-                        image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                         shell: Sh
                         command: |-
                           echo "Run Unit Test"
