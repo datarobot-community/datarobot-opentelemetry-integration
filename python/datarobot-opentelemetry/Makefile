@@ -71,9 +71,3 @@ test: unit-test ## Run all tests
 cov: ## Runs code tests with code coverage
 	@uv run pytest -s -v  --cov-report term --cov-report html --cov src/datarobot_opentelemetry ./tests
 	@echo "open file://`pwd`/htmlcov/index.html"
-
-
-.PHONY: docs
-docs: ## Post the documents locally
-	uv sync --group=doc
-	uv run mkdocs serve -a localhost:9002
