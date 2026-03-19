@@ -108,7 +108,7 @@ pipeline:
                             command: |-
                               echo "Run Ruff Linting"
                               cd python/datarobot-opentelemetry
-                              uv run --no-sync ruff src
+                              uv run --no-sync ruff check src
                       - step:
                           type: Run
                           name: Ruff Formatting
@@ -120,7 +120,7 @@ pipeline:
                             command: |-
                               echo "Run Ruff Formatting"
                               cd python/datarobot-opentelemetry
-                              uv run --no-sync ruff format src
+                              uv run --no-sync ruff format --check src
                       - step:
                           type: Run
                           name: Run Mypy
