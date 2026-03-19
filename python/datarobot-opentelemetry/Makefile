@@ -10,7 +10,7 @@ APP_PACKAGES ?= src/datarobot_opentelemetry
 TESTS ?= .
 
 .PHONY: ci
-ci: test-ruff test-black mypy license-check ## Runs all the CICD checks
+ci: test-ruff test-black mypy license-check test ## Runs all the CICD checks
 
 ########################################
 ##@ Lint
