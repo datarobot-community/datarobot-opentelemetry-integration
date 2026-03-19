@@ -1,10 +1,10 @@
 [project]
 name = "datarobot-opentelemetry"
 version = "0.1.0"
-description = "OpenTelemetry semantic conventions and helper utilities for DataRobot."
+description = "OpenTelemetry utilities and encapsulation of semantic naming conventions for improved integration with DataRobot."
 readme = "README.md"
 authors = [
-    { name = "Taras Nek", email = "taras.nek@datarobot.com" }
+    { name = "DataRobot", email = "taras.nek@datarobot.com" }
 ]
 requires-python = ">=3.12"
 dependencies = []
