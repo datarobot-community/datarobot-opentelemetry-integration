@@ -56,8 +56,8 @@ pipeline:
                     connectorRef: org.mmmdockerhubwriteorg
                     repo: datarobotdev/datarobot-opentelemetry
                     tags:
-                      - ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
-                    dockerfile: ci.Dockerfile
+                      - ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                    dockerfile: ci-python.Dockerfile
                     optimize: true
                     remoteCacheRepo: datarobotdev/datarobot-opentelemetry
                     resources:
@@ -103,30 +103,36 @@ pipeline:
                           identifier: Ruff_Linting
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Ruff Linting"
+                              echo "Run Ruff Linting"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync ruff check src
                       - step:
                           type: Run
                           name: Ruff Formatting
                           identifier: Black_Linting
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Ruff Formatting"
+                              echo "Run Ruff Formatting"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync ruff format --check src
                       - step:
                           type: Run
                           name: Run Mypy
                           identifier: Run_Mypy
                           spec:
                             connectorRef: account.dockerhub_datarobot_read
-                            image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                            image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                             shell: Sh
                             command: |-
-                              echo "TODO Add Mypy"
+                              echo "Run Mypy"
+                              cd python/datarobot-opentelemetry
+                              uv run --no-sync mypy --pretty --strict src
               caching:
                 enabled: false
                 paths: []
@@ -144,10 +150,12 @@ pipeline:
                       identifier: Run_Unit_Test
                       spec:
                         connectorRef: account.dockerhub_datarobot_read
-                        image: datarobotdev/datarobot-opentelemetry:ci-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                         shell: Sh
                         command: |-
-                          echo "TODO Add Unit Test"
+                          echo "Run Unit Test"
+                          cd python/datarobot-opentelemetry
+                          uv run --no-sync pytest -svvv tests/unit --junitxml=/harness/test_results/unit-test-results.xml
                         reports:
                           type: JUnit
                           spec:

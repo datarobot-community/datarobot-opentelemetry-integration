@@ -1,0 +1,13 @@
+# A common .dockerignore to rule them all.
+# Caution, use **/*.ext to ignore files on multiple levels
+.idea/
+.pre-commit-config.yaml
+env/
+**/__pycache__
+**/charts/
+**/.dockerignore
+**/Dockerfile
+**/*_cache
+**/test_results
+**/tests
+**/dist
