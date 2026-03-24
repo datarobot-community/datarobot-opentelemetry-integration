@@ -15,6 +15,7 @@ from typing import Final
 
 class SpanAttributes:
     """Constants for span attribute keys used in Gen AI telemetry."""
+
     # Attrribute keys from open-telemetry specification:
     # https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/
     GEN_AI_PROVIDER_NAME: Final = "gen_ai.provider.name"
@@ -54,7 +55,9 @@ class SpanAttributes:
     GEN_AI_TOOL_TYPE: Final = "gen_ai.tool.type"
     GEN_AI_TOOL_CALL_ARGUMENTS: Final = "gen_ai.tool.call.arguments"
     GEN_AI_TOOL_CALL_RESULT: Final = "gen_ai.tool.call.result"
-    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: Final = "gen_ai.usage.cache_creation.input_tokens"
+    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: Final = (
+        "gen_ai.usage.cache_creation.input_tokens"
+    )
     GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: Final = "gen_ai.usage.cache_read.input_tokens"
 
     # Derived attributes
@@ -70,7 +73,7 @@ class SpanAttributes:
     DATAROBOT_INPUT_VALUE: Final = "datarobot.input.value"
     DATAROBOT_OUTPUT_VALUE: Final = "datarobot.output.value"
     DATAROBOT_ERROR_COUNT: Final = "datarobot.error_count"
-    DATAROBOT_COMPLIANCE_LABELS: Final = "datarobot.compliance.labels"  
+    DATAROBOT_COMPLIANCE_LABELS: Final = "datarobot.compliance.labels"
     DATAROBOT_GUARDRAILS_TRIGGERED: Final = "datarobot.guardrails.triggered"
     DATAROBOT_GUARDRAILS_LABELS: Final = "datarobot.guardrails.labels"
     DATAROBOT_GUARDRAILS_ACTIONS: Final = "datarobot.guardrails.actions"
