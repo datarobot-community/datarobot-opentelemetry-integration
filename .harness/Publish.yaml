@@ -101,6 +101,29 @@ pipeline:
                   when:
                     stageStatus: Success
                     condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
+              - step:
+                  type: Run
+                  name: Create Git Tag
+                  identifier: Create_Git_Tag
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/git
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      TAG_NAME="python-v${PACKAGE_VERSION}"
+                      
+                      echo "Creating git tag: ${TAG_NAME}"
+                      git tag -a "${TAG_NAME}" -m "Release version ${PACKAGE_VERSION}"
+                      git push https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@github.com/datarobot/datarobot-opentelemetry.git "${TAG_NAME}"
+                      echo "✓ Tagged and pushed ${TAG_NAME}"
+                    envVariables:
+                      GITHUB_USERNAME: svc-harness-git2
+                      GITHUB_PASSWORD: <+secrets.getValue("account.githubpatsvcharnessgit2")>
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
           infrastructure:
             type: KubernetesDirect
             spec:
