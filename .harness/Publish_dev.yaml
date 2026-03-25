@@ -52,8 +52,8 @@ template:
                         uv run python3 --version
                         uv sync --extra dev
                       envVariables:
-                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                 - parallel:
                     - step:
                         type: Run
@@ -122,10 +122,10 @@ template:
                         BUILD_TYPE: <+pipeline.properties.ci.codebase.build.type>
                         BUILD_BRANCH: <+pipeline.properties.ci.codebase.build.spec.branch>
                         BUILD_NUMBER: <+pipeline.properties.ci.codebase.build.spec.number>
-                        ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
-                        ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                        ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                        ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                     description: Builds and publishes a dev version with the commit hash appended (e.g. 1.2.3.dev0+abc1234) to Artifactory on every primary branch merge.
                     when:
                       stageStatus: Success
@@ -136,19 +136,9 @@ template:
               description: The python version to use, e.g. 3.10, 3.11, 3.12
               required: true
               value: "3.12"
-            - name: ARTIFACTORY_USERNAME
-              type: String
-              description: The username to use for artifactory, used to both read and write
-              required: false
-              value: <+input>
-            - name: ARTIFACTORY_PASSWORD
-              type: Secret
-              description: The password to use for artifactory, used to both read and write
-              required: true
-              value: <+input>
     variables:
       - name: primaryBranchName
         type: String
         description: The name of the primary branch for the repo (e.g. master or main). Is used to determine whether the pipeline is running on the primary branch, which is used to determine whether or not the pipeline should attempt to publish.
         required: true
-        value: <+input>
+        value: main

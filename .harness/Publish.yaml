@@ -13,7 +13,7 @@ pipeline:
   variables:
     - name: primaryBranchName
       type: String
-      description: Primary branch for conditional publishing (e.g., main)
+      description: Primary branch for conditional publishing
       required: true
       value: main
   stages:
@@ -25,20 +25,6 @@ pipeline:
           cloneCodebase: true
           execution:
             steps:
-              - step:
-                  type: Run
-                  name: Extract Package Info
-                  identifier: Extract_Package_Info
-                  spec:
-                    connectorRef: account.dockerhub_datarobot_read
-                    image: alpine/git
-                    shell: Sh
-                    command: |-
-                      cd python/datarobot-opentelemetry
-                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
-                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
-                      echo "Package: ${PACKAGE_NAME}"
-                      echo "Version: ${PACKAGE_VERSION}"
               - step:
                   type: Run
                   name: Build Distribution
@@ -53,8 +39,8 @@ pipeline:
                       echo "Build complete. Artifacts:"
                       ls -lh dist/
                     envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
               - step:
                   type: Run
                   name: Check Version Not Duplicate
@@ -87,8 +73,8 @@ pipeline:
                         echo "✓ Version ${PACKAGE_VERSION} is new, ready to publish"
                       fi
                     envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
               - step:
                   type: Run
                   name: Publish to Artifactory
@@ -108,10 +94,10 @@ pipeline:
                         --publish-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
                       echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
                     envVariables:
-                      ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
-                      ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                      ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                      ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>>
                   when:
                     stageStatus: Success
                     condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
@@ -123,14 +109,4 @@ pipeline:
               automountServiceAccountToken: true
               nodeSelector: {}
               os: Linux
-          variables:
-            - name: ARTIFACTORY_USERNAME
-              type: String
-              description: Artifactory username for reading dependencies and publishing
-              required: true
-              value: <+input>
-            - name: ARTIFACTORY_PASSWORD
-              type: Secret
-              description: Artifactory password/token for reading dependencies and publishing
-              required: true
-              value: <+input>
+          variables: []
