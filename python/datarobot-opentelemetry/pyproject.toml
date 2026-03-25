@@ -3,11 +3,23 @@ name = "datarobot-opentelemetry"
 version = "0.1.0"
 description = "OpenTelemetry utilities and encapsulation of semantic naming conventions for improved integration with DataRobot."
 readme = "README.md"
+license = { text = "Proprietary" }
 authors = [
     { name = "DataRobot", email = "support@datarobot.com" }
 ]
 requires-python = ">=3.12"
 dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/datarobot/datarobot-opentelemetry"
+Repository = "https://github.com/datarobot/datarobot-opentelemetry"
 
 [build-system]
 requires = ["hatchling"]

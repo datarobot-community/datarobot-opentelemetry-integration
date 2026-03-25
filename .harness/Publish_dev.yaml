@@ -1,0 +1,154 @@
+template:
+  name: Publish dev version to Artifactory
+  identifier: Publish_dev
+  versionLabel: dev
+  type: Pipeline
+  description: A full-featured test-and-publish pipeline built around uv and ruff (and pytest).
+  tags: {}
+  spec:
+    properties:
+      ci:
+        codebase:
+          connectorRef: account.svc_harness_git1
+          repoName: <+input>
+          build: <+input>
+    stages:
+      - stage:
+          name: Run Tests and Publish
+          identifier: Run_Tests_and_Publish
+          description: ""
+          type: CI
+          spec:
+            cloneCodebase: true
+            caching:
+              enabled: false
+              override: false
+              paths: []
+            buildIntelligence:
+              enabled: false
+            platform:
+              os: Linux
+              arch: Amd64
+            runtime:
+              type: Cloud
+              spec: {}
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Install Dependencies
+                    identifier: Initialize
+                    description: Prepare the environment
+                    spec:
+                      shell: Bash
+                      command: |-
+                        curl -LsSf https://astral.sh/uv/install.sh | sh
+
+                        cd python/datarobot-opentelemetry
+
+                        uv python install <+stage.variables.pythonVersion>
+                        uv venv -p <+stage.variables.pythonVersion> .venv
+                        source .venv/bin/activate
+                        uv run python3 --version
+                        uv sync --extra dev
+                      envVariables:
+                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                - parallel:
+                    - step:
+                        type: Run
+                        name: Run Tests
+                        identifier: Run_Tests
+                        spec:
+                          shell: Bash
+                          command: |-
+                            cd python/datarobot-opentelemetry
+                            source .venv/bin/activate
+                            uv run python3 -m pytest tests/ --junit-xml test-results.xml
+                          reports:
+                            type: JUnit
+                            spec:
+                              paths:
+                                - python/datarobot-opentelemetry/test-results.xml
+                    - step:
+                        type: Run
+                        name: Run Formatter Check
+                        identifier: Run_Formatter_Check
+                        spec:
+                          shell: Bash
+                          command: |-
+                            cd python/datarobot-opentelemetry
+                            uv run ruff format --check
+                    - step:
+                        type: Run
+                        name: Run Linter Check
+                        identifier: Run_Linter_Check
+                        spec:
+                          shell: Bash
+                          command: |-
+                            cd python/datarobot-opentelemetry
+                            uv run ruff check
+                - step:
+                    type: Run
+                    name: Publish Dev Version
+                    identifier: Maybe_Publish
+                    spec:
+                      shell: Bash
+                      command: |-
+                        cd python/datarobot-opentelemetry
+
+                        export PACKAGE_NAME=$(uv version | awk '{print $1}')
+                        export BASE_VERSION=$(uv version --short)
+                        export COMMIT_HASH=$(git rev-parse --short HEAD)
+                        export DEV_VERSION="${BASE_VERSION}.dev0+${COMMIT_HASH}"
+
+                        echo "Package:      ${PACKAGE_NAME}"
+                        echo "Base version: ${BASE_VERSION}"
+                        echo "Dev version:  ${DEV_VERSION}"
+
+                        # Stamp the dev version into pyproject.toml before building
+                        sed -i "s/^version = \"${BASE_VERSION}\"/version = \"${DEV_VERSION}\"/" pyproject.toml
+
+                        # n.b. `uv build` uses a separate compartmentalized environment to build
+                        # which is why we have to inject UV_INDEX_DR_ARTIFACTORY credentials
+                        uv build
+
+                        echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
+                        uv publish \
+                          --check-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                          --publish-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                        echo "✓ Published ${DEV_VERSION}"
+                      envVariables:
+                        BUILD_TYPE: <+pipeline.properties.ci.codebase.build.type>
+                        BUILD_BRANCH: <+pipeline.properties.ci.codebase.build.spec.branch>
+                        BUILD_NUMBER: <+pipeline.properties.ci.codebase.build.spec.number>
+                        ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                        ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                        UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                        UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                    description: Builds and publishes a dev version with the commit hash appended (e.g. 1.2.3.dev0+abc1234) to Artifactory on every primary branch merge.
+                    when:
+                      stageStatus: Success
+                      condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
+          variables:
+            - name: pythonVersion
+              type: String
+              description: The python version to use, e.g. 3.10, 3.11, 3.12
+              required: true
+              value: "3.12"
+            - name: ARTIFACTORY_USERNAME
+              type: String
+              description: The username to use for artifactory, used to both read and write
+              required: false
+              value: <+input>
+            - name: ARTIFACTORY_PASSWORD
+              type: Secret
+              description: The password to use for artifactory, used to both read and write
+              required: true
+              value: <+input>
+    variables:
+      - name: primaryBranchName
+        type: String
+        description: The name of the primary branch for the repo (e.g. master or main). Is used to determine whether the pipeline is running on the primary branch, which is used to determine whether or not the pipeline should attempt to publish.
+        required: true
+        value: <+input>

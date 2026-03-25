@@ -1,0 +1,136 @@
+pipeline:
+  name: Publish
+  identifier: Publish
+  projectIdentifier: datarobotopentelemetry
+  orgIdentifier: MMM
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.svc_harness_git1
+        repoName: datarobot-opentelemetry
+        build: <+input>
+  variables:
+    - name: primaryBranchName
+      type: String
+      description: Primary branch for conditional publishing (e.g., main)
+      required: true
+      value: main
+  stages:
+    - stage:
+        name: Build and Publish
+        identifier: Build_and_Publish
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Extract Package Info
+                  identifier: Extract_Package_Info
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/git
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      echo "Package: ${PACKAGE_NAME}"
+                      echo "Version: ${PACKAGE_VERSION}"
+              - step:
+                  type: Run
+                  name: Build Distribution
+                  identifier: Build_Distribution
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: ghcr.io/astral-sh/uv:latest
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      uv build
+                      echo "Build complete. Artifacts:"
+                      ls -lh dist/
+                    envVariables:
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+              - step:
+                  type: Run
+                  name: Check Version Not Duplicate
+                  identifier: Check_Version_Not_Duplicate
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: ghcr.io/astral-sh/uv:latest
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      
+                      echo "Checking if ${PACKAGE_NAME}==${PACKAGE_VERSION} already exists in Artifactory..."
+                      
+                      # Create a separate venv for the check (don't use local install)
+                      uv venv .test_pkg_pull_venv
+                      source .test_pkg_pull_venv/bin/activate
+                      set +e
+                      uv pip install "${PACKAGE_NAME}==${PACKAGE_VERSION}" --dry-run
+                      EXIT_CODE=$?
+                      set -e
+                      deactivate
+                      
+                      if [ $EXIT_CODE -eq 0 ]; then
+                        echo "⚠️  Version ${PACKAGE_VERSION} already exists in Artifactory"
+                        echo "Skipping publish to avoid duplicate"
+                        exit 1
+                      else
+                        echo "✓ Version ${PACKAGE_VERSION} is new, ready to publish"
+                      fi
+                    envVariables:
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+              - step:
+                  type: Run
+                  name: Publish to Artifactory
+                  identifier: Publish_to_Artifactory
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: ghcr.io/astral-sh/uv:latest
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      
+                      echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
+                      uv publish \
+                        --check-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                        --publish-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                      echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+                    envVariables:
+                      ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                      ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+stage.variables.ARTIFACTORY_PASSWORD>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+stage.variables.ARTIFACTORY_USERNAME>
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          variables:
+            - name: ARTIFACTORY_USERNAME
+              type: String
+              description: Artifactory username for reading dependencies and publishing
+              required: true
+              value: <+input>
+            - name: ARTIFACTORY_PASSWORD
+              type: Secret
+              description: Artifactory password/token for reading dependencies and publishing
+              required: true
+              value: <+input>

@@ -9,8 +9,7 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
     PATH="/opt/app/.venv/bin:$PATH" \
     UV_NO_CACHE=1 \
     UV_PROJECT_ENVIRONMENT="/opt/app/.venv" \
-    APP_VERSION="0.0.1" \
-    APP_COMMIT_HASH_SHORT="EEEEEE"
+    APP_VERSION="0.0.1"
 
 # Install system dependencies
 RUN apk update && \
@@ -26,8 +25,6 @@ COPY python/datarobot-opentelemetry .
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN git config --global --add safe.directory /opt/app && \
     uv version -- $APP_VERSION && \
-    sed -i "s/0.0.0/$APP_VERSION/g" src/datarobot_opentelemetry/__init__.py && \
-    sed -i "s/FFFFFFF/$APP_COMMIT_HASH_SHORT/g" src/datarobot_opentelemetry/__init__.py && \
     uv sync --frozen --no-cache
 
 ENV RUFF_CACHE_DIR=/tmp
