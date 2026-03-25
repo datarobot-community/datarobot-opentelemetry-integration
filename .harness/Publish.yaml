@@ -43,40 +43,6 @@ pipeline:
                       UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
               - step:
                   type: Run
-                  name: Check Version Not Duplicate
-                  identifier: Check_Version_Not_Duplicate
-                  spec:
-                    connectorRef: account.dockerhub_datarobot_read
-                    image: ghcr.io/astral-sh/uv:latest
-                    shell: Sh
-                    command: |-
-                      cd python/datarobot-opentelemetry
-                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
-                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
-                      
-                      echo "Checking if ${PACKAGE_NAME}==${PACKAGE_VERSION} already exists in Artifactory..."
-                      
-                      # Create a separate venv for the check (don't use local install)
-                      uv venv .test_pkg_pull_venv
-                      source .test_pkg_pull_venv/bin/activate
-                      set +e
-                      uv pip install "${PACKAGE_NAME}==${PACKAGE_VERSION}" --dry-run
-                      EXIT_CODE=$?
-                      set -e
-                      deactivate
-                      
-                      if [ $EXIT_CODE -eq 0 ]; then
-                        echo "⚠️  Version ${PACKAGE_VERSION} already exists in Artifactory"
-                        echo "Skipping publish to avoid duplicate"
-                        exit 1
-                      else
-                        echo "✓ Version ${PACKAGE_VERSION} is new, ready to publish"
-                      fi
-                    envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
-              - step:
-                  type: Run
                   name: Publish to Artifactory
                   identifier: Publish_to_Artifactory
                   spec:
