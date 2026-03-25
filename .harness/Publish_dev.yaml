@@ -119,9 +119,6 @@ template:
                           --publish-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
                         echo "✓ Published ${DEV_VERSION}"
                       envVariables:
-                        BUILD_TYPE: <+pipeline.properties.ci.codebase.build.type>
-                        BUILD_BRANCH: <+pipeline.properties.ci.codebase.build.spec.branch>
-                        BUILD_NUMBER: <+pipeline.properties.ci.codebase.build.spec.number>
                         ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                         ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
                         UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
