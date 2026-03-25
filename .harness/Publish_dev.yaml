@@ -115,8 +115,10 @@ template:
 
                         echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
                         uv publish \
-                          --check-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                          --publish-url "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                          --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                          --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev" \
+                          --username "${ARTIFACTORY_USERNAME}" \
+                          --password "${ARTIFACTORY_PASSWORD}"
                         echo "✓ Published ${DEV_VERSION}"
                       envVariables:
                         ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
