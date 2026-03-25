@@ -97,7 +97,7 @@ pipeline:
                       ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                       ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
                       UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                   when:
                     stageStatus: Success
                     condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
