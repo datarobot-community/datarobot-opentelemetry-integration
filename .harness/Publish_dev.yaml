@@ -50,7 +50,7 @@ template:
                         uv venv -p <+stage.variables.pythonVersion> .venv
                         source .venv/bin/activate
                         uv run python3 --version
-                        uv sync --extra dev
+                        uv sync --group dev
                       envVariables:
                         UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
                         UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
