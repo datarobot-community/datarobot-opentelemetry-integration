@@ -1,0 +1,115 @@
+pipeline:
+  name: Publish
+  identifier: Publish
+  projectIdentifier: datarobotopentelemetry
+  orgIdentifier: MMM
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.svc_harness_git1
+        repoName: datarobot-opentelemetry
+        build: <+input>
+  variables:
+    - name: primaryBranchName
+      type: String
+      description: Primary branch for conditional publishing
+      required: true
+      value: main
+  stages:
+    - stage:
+        name: Build and Publish
+        identifier: Build_and_Publish
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Build Distribution
+                  identifier: Build_Distribution
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: ghcr.io/astral-sh/uv:latest
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      uv build
+                      echo "Build complete. Artifacts:"
+                      ls -lh dist/
+                    envVariables:
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+              - step:
+                  type: Run
+                  name: Publish to Artifactory
+                  identifier: Publish_to_Artifactory
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: ghcr.io/astral-sh/uv:latest
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      
+                      echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
+                      uv publish \
+                        --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev" \
+                        --username "${ARTIFACTORY_USERNAME}" \
+                        --password "${ARTIFACTORY_PASSWORD}"
+                      echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+                    envVariables:
+                      ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                      ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
+              - step:
+                  type: Run
+                  name: Create Git Tag
+                  identifier: Create_Git_Tag
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/git
+                    shell: Sh
+                    command: |-
+                      cd python/datarobot-opentelemetry
+                      PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
+                      TAG_NAME="python-v${PACKAGE_VERSION}"
+                      
+                      echo "Creating git tag: ${TAG_NAME}"
+                      git tag -a "${TAG_NAME}" -m "Release version ${PACKAGE_VERSION}"
+
+                      cat <<'EOF' >/tmp/git-askpass.sh
+                      #!/bin/sh
+                      case "$1" in
+                        *Username*) echo "$GITHUB_USERNAME" ;;
+                        *Password*) echo "$GITHUB_PASSWORD" ;;
+                      esac
+                      EOF
+                      chmod 700 /tmp/git-askpass.sh
+
+                      GIT_ASKPASS=/tmp/git-askpass.sh GIT_TERMINAL_PROMPT=0 \
+                        git push https://github.com/datarobot/datarobot-opentelemetry.git "${TAG_NAME}"
+                      rm -f /tmp/git-askpass.sh
+                      echo "✓ Tagged and pushed ${TAG_NAME}"
+                    envVariables:
+                      GITHUB_USERNAME: svc-harness-git2
+                      GITHUB_PASSWORD: <+secrets.getValue("account.githubpatsvcharnessgit2")>
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          variables: []

@@ -16,7 +16,7 @@ from typing import Final
 class SpanAttributes:
     """Constants for span attribute keys used in Gen AI telemetry."""
 
-    # Attrribute keys from open-telemetry specification:
+    # Attribute keys from open-telemetry specification:
     # https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/
     GEN_AI_PROVIDER_NAME: Final = "gen_ai.provider.name"
     GEN_AI_OPERATION_NAME: Final = "gen_ai.operation.name"
@@ -60,10 +60,6 @@ class SpanAttributes:
     )
     GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: Final = "gen_ai.usage.cache_read.input_tokens"
 
-    # Derived attributes
-    GEN_AI_USAGE_TOTAL_TOKENS: Final = "gen_ai.usage.total_tokens"
-    GEN_AI_USAGE_COST: Final = "gen_ai.usage.cost"
-
     # DataRobot specific attributes
     DATAROBOT_TRACE_NAME: Final = "datarobot.trace_name"
     DATAROBOT_USER_ID: Final = "datarobot.user_id"
@@ -77,3 +73,4 @@ class SpanAttributes:
     DATAROBOT_GUARDRAILS_TRIGGERED: Final = "datarobot.guardrails.triggered"
     DATAROBOT_GUARDRAILS_LABELS: Final = "datarobot.guardrails.labels"
     DATAROBOT_GUARDRAILS_ACTIONS: Final = "datarobot.guardrails.actions"
+    DATAROBOT_MODERATION_COST: Final = "datarobot.moderation.cost"
