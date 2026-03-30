@@ -114,12 +114,12 @@ pipeline:
                         shell: Sh
                         command: |-
                           cd python/datarobot-opentelemetry
-                          uv run --no-sync python3 -m pytest tests/ --junit-xml test-results.xml
+                          uv run --no-sync python3 -m pytest tests/ --junit-xml /harness/test_results/test-results.xml
                         reports:
                           type: JUnit
                           spec:
                             paths:
-                              - python/datarobot-opentelemetry/test-results.xml
+                              - /harness/test_results/test-results.xml
                   - step:
                       type: Run
                       name: Run Formatter Check
