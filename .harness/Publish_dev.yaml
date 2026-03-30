@@ -153,16 +153,22 @@ pipeline:
                     command: |-
                       set -euo pipefail
 
+                      # Extract git info and version while in the repo context
                       cd python/datarobot-opentelemetry
-
+                      export COMMIT_HASH=$(git rev-parse --short HEAD)
                       export PACKAGE_NAME=$(uv version | awk '{print $1}')
                       export BASE_VERSION=$(uv version --short)
-                      export COMMIT_HASH=$(git rev-parse --short HEAD)
+                      cd ../..
+
                       export DEV_VERSION="${BASE_VERSION}.dev0+${COMMIT_HASH}"
 
                       echo "Package:      ${PACKAGE_NAME}"
                       echo "Base version: ${BASE_VERSION}"
                       echo "Dev version:  ${DEV_VERSION}"
+
+                      # Copy to writable location for modification
+                      cp -r python/datarobot-opentelemetry /tmp/build-workspace
+                      cd /tmp/build-workspace
 
                       # Stamp the dev version into pyproject.toml before building
                       sed -i "s/^version = \"${BASE_VERSION}\"/version = \"${DEV_VERSION}\"/" pyproject.toml
