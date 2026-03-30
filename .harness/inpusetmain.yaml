@@ -4,7 +4,7 @@ inputSet:
   orgIdentifier: MMM
   projectIdentifier: datarobotopentelemetry
   pipeline:
-    identifier: CD
+    identifier: Publish_dev
     properties:
       ci:
         codebase:
