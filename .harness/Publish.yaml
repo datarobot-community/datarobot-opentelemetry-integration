@@ -31,25 +31,30 @@ pipeline:
                   identifier: Build_Distribution
                   spec:
                     connectorRef: account.dockerhub_datarobot_read
-                    image: ghcr.io/astral-sh/uv:latest
-                    shell: Sh
+                    image: python:3.12-slim
+                    shell: Bash
                     command: |-
+                      set -euo pipefail
+                      curl -LsSf https://astral.sh/uv/install.sh | sh
+                      export PATH="${HOME}/.local/bin:${PATH}"
+
                       cd python/datarobot-opentelemetry
                       uv build
                       echo "Build complete. Artifacts:"
                       ls -lh dist/
-                    envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
               - step:
                   type: Run
                   name: Publish to Artifactory
                   identifier: Publish_to_Artifactory
                   spec:
                     connectorRef: account.dockerhub_datarobot_read
-                    image: ghcr.io/astral-sh/uv:latest
-                    shell: Sh
+                    image: python:3.12-slim
+                    shell: Bash
                     command: |-
+                      set -euo pipefail
+                      curl -LsSf https://astral.sh/uv/install.sh | sh
+                      export PATH="${HOME}/.local/bin:${PATH}"
+
                       cd python/datarobot-opentelemetry
                       PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
                       PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
@@ -57,15 +62,11 @@ pipeline:
                       echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
                       uv publish \
                         --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev" \
-                        --username "${ARTIFACTORY_USERNAME}" \
-                        --password "${ARTIFACTORY_PASSWORD}"
+                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
                       echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
                     envVariables:
-                      ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
-                      ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                      UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
+                      UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
                   when:
                     stageStatus: Success
                     condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
