@@ -1,0 +1,14 @@
+inputSet:
+  name: input-set-main
+  identifier: inputsetmain
+  orgIdentifier: MMM
+  projectIdentifier: datarobotopentelemetry
+  pipeline:
+    identifier: Publish_dev
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: main
