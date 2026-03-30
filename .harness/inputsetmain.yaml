@@ -8,6 +8,7 @@ inputSet:
     properties:
       ci:
         codebase:
+          repoName: datarobot-opentelemetry
           build:
             type: branch
             spec:

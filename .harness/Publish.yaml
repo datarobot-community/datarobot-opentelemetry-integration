@@ -118,12 +118,22 @@ pipeline:
                       rm -rf /tmp/dist && mkdir -p /tmp/dist
                       uv build --out-dir /tmp/dist
 
-                      echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
-                      set +x
-                      uv publish /tmp/dist/* \
-                        --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
-                      echo "✓ Publish step completed for ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+                      # Check if it is safe to try to push - if the current version already exists in
+                      # artifactory, we won't even try to publish (but still keep the pipeline green)
+                      set +e
+                      uv pip install ${PACKAGE_NAME}==${PACKAGE_VERSION} --dry-run
+                      EXIT_CODE=$?
+                      set -e
+
+                      if [ $EXIT_CODE -eq 0 ]; then
+                        echo "Package already exists on artifactory, not trying to upload"
+                      else
+                        echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
+                        uv publish /tmp/dist/* \
+                          --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                          --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                        echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+                      fi
                     envVariables:
                       UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
                       UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
