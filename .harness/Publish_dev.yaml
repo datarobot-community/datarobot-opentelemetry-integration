@@ -147,8 +147,6 @@ pipeline:
                   name: Publish Dev Version
                   identifier: Maybe_Publish
                   spec:
-                    connectorRef: account.dockerhub_datarobot_read
-                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                     shell: Sh
                     command: |-
                       set -euo pipefail
@@ -181,6 +179,8 @@ pipeline:
                     envVariables:
                       UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
                       UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
                   description: Builds and publishes a dev version with the commit hash appended (e.g. 1.2.3.dev0+abc1234) to Artifactory on every primary branch merge.
                   when:
                     stageStatus: Success
