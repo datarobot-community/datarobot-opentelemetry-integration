@@ -50,9 +50,6 @@ pipeline:
                       source .venv/bin/activate
                       uv run python3 --version
                       uv sync --group dev
-                    envVariables:
-                      UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
               - parallel:
                   - step:
                       type: Run

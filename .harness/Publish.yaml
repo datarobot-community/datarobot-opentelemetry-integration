@@ -42,9 +42,6 @@ pipeline:
                       uv build
                       echo "Build complete. Artifacts:"
                       ls -lh dist/
-                    envVariables:
-                      UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
               - step:
                   type: Run
                   name: Publish to Artifactory
