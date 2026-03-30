@@ -13,6 +13,74 @@ pipeline:
         build: <+input>
   stages:
     - stage:
+        name: Git Hash
+        identifier: Git_Hash
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Git Hash
+                  identifier: Git_Hash
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/git
+                    shell: Sh
+                    command: export GIT_HASH_SHORT=$(git rev-parse --short HEAD)
+                    outputVariables:
+                      - name: GIT_HASH_SHORT
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+    - stage:
+        name: Build Docker Image
+        identifier: Build_Docker_Image
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: BuildAndPushDockerRegistry
+                  name: Build and Push Image
+                  identifier: Build_and_Push_Image
+                  spec:
+                    connectorRef: org.mmmdockerhubwriteorg
+                    repo: datarobotdev/datarobot-opentelemetry
+                    tags:
+                      - ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                    dockerfile: ci-python.Dockerfile
+                    optimize: true
+                    remoteCacheRepo: datarobotdev/datarobot-opentelemetry
+                    resources:
+                      limits:
+                        memory: 1Gi
+                        cpu: "1"
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              containerSecurityContext:
+                privileged: false
+              os: Linux
+          caching:
+            enabled: false
+            paths: []
+          slsa_provenance:
+            enabled: false
+    - stage:
         name: Run Tests and Publish
         identifier: Run_Tests_and_Publish
         description: ""
@@ -25,42 +93,28 @@ pipeline:
             paths: []
           buildIntelligence:
             enabled: false
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Cloud
-            spec: {}
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
           execution:
             steps:
-              - step:
-                  type: Run
-                  name: Install Dependencies
-                  identifier: Initialize
-                  description: Prepare the environment
-                  spec:
-                    shell: Bash
-                    command: |-
-                      curl -LsSf https://astral.sh/uv/install.sh | sh
-
-                      cd python/datarobot-opentelemetry
-
-                      uv python install <+stage.variables.pythonVersion>
-                      uv venv -p <+stage.variables.pythonVersion> .venv
-                      source .venv/bin/activate
-                      uv run python3 --version
-                      uv sync --group dev
               - parallel:
                   - step:
                       type: Run
                       name: Run Tests
                       identifier: Run_Tests
                       spec:
-                        shell: Bash
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        shell: Sh
                         command: |-
                           cd python/datarobot-opentelemetry
-                          source .venv/bin/activate
-                          uv run python3 -m pytest tests/ --junit-xml test-results.xml
+                          uv run --no-sync python3 -m pytest tests/ --junit-xml test-results.xml
                         reports:
                           type: JUnit
                           spec:
@@ -71,25 +125,31 @@ pipeline:
                       name: Run Formatter Check
                       identifier: Run_Formatter_Check
                       spec:
-                        shell: Bash
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        shell: Sh
                         command: |-
                           cd python/datarobot-opentelemetry
-                          uv run ruff format --check
+                          uv run --no-sync ruff format --check src
                   - step:
                       type: Run
                       name: Run Linter Check
                       identifier: Run_Linter_Check
                       spec:
-                        shell: Bash
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                        shell: Sh
                         command: |-
                           cd python/datarobot-opentelemetry
-                          uv run ruff check
+                          uv run --no-sync ruff check src
               - step:
                   type: Run
                   name: Publish Dev Version
                   identifier: Maybe_Publish
                   spec:
-                    shell: Bash
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                    shell: Sh
                     command: |-
                       set -euo pipefail
 
@@ -125,12 +185,6 @@ pipeline:
                   when:
                     stageStatus: Success
                     condition: <+pipeline.properties.ci.codebase.build.spec.branch> == <+pipeline.variables.primaryBranchName>
-        variables:
-          - name: pythonVersion
-            type: String
-            description: The python version to use, e.g. 3.10, 3.11, 3.12
-            required: true
-            value: "3.12"
   variables:
     - name: primaryBranchName
       type: String
