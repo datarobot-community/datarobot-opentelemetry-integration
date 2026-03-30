@@ -169,10 +169,13 @@ pipeline:
 
                       # n.b. `uv build` uses a separate compartmentalized environment to build
                       # which is why we have to inject UV_INDEX_DR_ARTIFACTORY credentials
-                      uv build
+                      rm -rf /tmp/dist && mkdir -p /tmp/dist
+                      uv build --out-dir /tmp/dist
 
+                      set +e
                       uv pip install ${PACKAGE_NAME}==${DEV_VERSION} --dry-run
                       EXIT_CODE=$?
+                      set -e
 
                       if [ $EXIT_CODE -eq 0 ]; then
                         echo "Package already exists on artifactory, not trying to upload"
@@ -181,7 +184,7 @@ pipeline:
                         echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
                         # Prevent secret expansion from being printed if xtrace is enabled upstream.
                         set +x
-                        uv publish \
+                        uv publish /tmp/dist/* \
                           --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
                           --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
                         echo "✓ Published ${DEV_VERSION}"
