@@ -152,6 +152,8 @@ pipeline:
                     shell: Sh
                     command: |-
                       cd python/datarobot-opentelemetry
+                      git config --global user.email "harness-ci@datarobot.com"
+                      git config --global user.name "Harness CI"
                       PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
                       TAG_NAME="python-v${PACKAGE_VERSION}"
                       
