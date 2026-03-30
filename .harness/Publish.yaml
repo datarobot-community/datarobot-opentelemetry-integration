@@ -106,6 +106,8 @@ pipeline:
                   name: Build Distribution
                   identifier: Build_Distribution
                   spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                     shell: Sh
                     command: |-
                       set -euo pipefail
@@ -121,6 +123,8 @@ pipeline:
                   name: Publish to Artifactory
                   identifier: Publish_to_Artifactory
                   spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                     shell: Sh
                     command: |-
                       set -euo pipefail
