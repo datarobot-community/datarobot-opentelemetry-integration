@@ -126,7 +126,8 @@ pipeline:
                       # Check if it is safe to try to push - if the current version already exists in
                       # artifactory, we won't even try to publish (but still keep the pipeline green)
                       set +e
-                      uv pip install ${PACKAGE_NAME}==${PACKAGE_VERSION} --dry-run
+                      uv pip install ${PACKAGE_NAME}==${PACKAGE_VERSION} --dry-run \
+                        --index-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple"
                       EXIT_CODE=$?
                       set -e
 

@@ -179,7 +179,8 @@ pipeline:
                       uv build --out-dir /tmp/dist
 
                       set +e
-                      uv pip install ${PACKAGE_NAME}==${DEV_VERSION} --dry-run
+                      uv pip install ${PACKAGE_NAME}==${DEV_VERSION} --dry-run \
+                        --index-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple"
                       EXIT_CODE=$?
                       set -e
 
