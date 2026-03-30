@@ -51,8 +51,8 @@ pipeline:
                       uv run python3 --version
                       uv sync --group dev
                     envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                      UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
+                      UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
               - parallel:
                   - step:
                       type: Run
@@ -94,6 +94,8 @@ pipeline:
                   spec:
                     shell: Bash
                     command: |-
+                      set -euo pipefail
+
                       cd python/datarobot-opentelemetry
 
                       export PACKAGE_NAME=$(uv version | awk '{print $1}')
@@ -113,17 +115,15 @@ pipeline:
                       uv build
 
                       echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
+                      # Prevent secret expansion from being printed if xtrace is enabled upstream.
+                      set +x
                       uv publish \
                         --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev" \
-                        --username "${ARTIFACTORY_USERNAME}" \
-                        --password "${ARTIFACTORY_PASSWORD}"
+                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
                       echo "✓ Published ${DEV_VERSION}"
                     envVariables:
-                      ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
-                      ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
+                      UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
+                      UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
                   description: Builds and publishes a dev version with the commit hash appended (e.g. 1.2.3.dev0+abc1234) to Artifactory on every primary branch merge.
                   when:
                     stageStatus: Success
