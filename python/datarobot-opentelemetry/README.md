@@ -36,4 +36,8 @@ All constants live in `datarobot_opentelemetry.semconv.SpanAttributes`.
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.10+
+
+## Release History
+
+- See CHANGELOG.md for version-by-version release notes.

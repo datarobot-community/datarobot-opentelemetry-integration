@@ -115,6 +115,11 @@ pipeline:
                       PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
                       PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
 
+                      if ! grep -q "^## \[${PACKAGE_VERSION}\]" CHANGELOG.md; then
+                        echo "ERROR: Missing release notes for version ${PACKAGE_VERSION} in CHANGELOG.md"
+                        exit 1
+                      fi
+
                       rm -rf /tmp/dist && mkdir -p /tmp/dist
                       uv build --out-dir /tmp/dist
 
