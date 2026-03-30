@@ -171,13 +171,21 @@ pipeline:
                       # which is why we have to inject UV_INDEX_DR_ARTIFACTORY credentials
                       uv build
 
-                      echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
-                      # Prevent secret expansion from being printed if xtrace is enabled upstream.
-                      set +x
-                      uv publish \
-                        --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
-                      echo "✓ Published ${DEV_VERSION}"
+                      uv pip install ${PACKAGE_NAME}==${DEV_VERSION} --dry-run
+                      EXIT_CODE=$?
+
+                      if [ $EXIT_CODE -eq 0 ]; then
+                        echo "Package already exists on artifactory, not trying to upload"
+
+                      else
+                        echo "Publishing ${PACKAGE_NAME} ${DEV_VERSION} to Artifactory..."
+                        # Prevent secret expansion from being printed if xtrace is enabled upstream.
+                        set +x
+                        uv publish \
+                          --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                          --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                        echo "✓ Published ${DEV_VERSION}"
+                      fi
                     envVariables:
                       UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
                       UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>

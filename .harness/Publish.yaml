@@ -103,23 +103,6 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: Build Distribution
-                  identifier: Build_Distribution
-                  spec:
-                    connectorRef: account.dockerhub_datarobot_read
-                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
-                    shell: Sh
-                    command: |-
-                      set -euo pipefail
-                      cd python/datarobot-opentelemetry
-                      uv build
-                      echo "Build complete. Artifacts:"
-                      ls -lh dist/
-                    envVariables:
-                      UV_INDEX_DR_ARTIFACTORY_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
-                      UV_INDEX_DR_ARTIFACTORY_USERNAME: <+variable.account.artifactory_username>
-              - step:
-                  type: Run
                   name: Publish to Artifactory
                   identifier: Publish_to_Artifactory
                   spec:
@@ -131,13 +114,23 @@ pipeline:
                       cd python/datarobot-opentelemetry
                       PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
                       PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
-                      
-                      echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
-                      set +x
-                      uv publish \
-                        --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
-                        --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
-                      echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+
+                      uv build
+
+                      # Check if it is safe to try to push - if the current version already exists in
+                      # artifactory, we won't even try to publish (but still keep the pipeline green)
+                      uv pip install ${PACKAGE_NAME}==${PACKAGE_VERSION} --dry-run
+                      EXIT_CODE=$?
+
+                      if [ $EXIT_CODE -eq 0 ]; then
+                        echo "Package already exists on artifactory, not trying to upload"
+                      else
+                        echo "Publishing ${PACKAGE_NAME} v${PACKAGE_VERSION} to Artifactory..."
+                        uv publish \
+                          --check-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/python-all/simple" \
+                          --publish-url "https://artifactory.devinfra.drdev.io/artifactory/api/pypi/datarobot-python-dev"
+                        echo "✓ Successfully published ${PACKAGE_NAME} v${PACKAGE_VERSION}"
+                      fi
                     envVariables:
                       UV_PUBLISH_USERNAME: <+variable.account.artifactory_username>
                       UV_PUBLISH_PASSWORD: <+secrets.getValue("account.jenkins_upload_artifactory_password")>
