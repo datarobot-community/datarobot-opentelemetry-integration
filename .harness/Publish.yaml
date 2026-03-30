@@ -31,9 +31,13 @@ pipeline:
                   identifier: Build_Distribution
                   spec:
                     connectorRef: account.dockerhub_datarobot_read
-                    image: ghcr.io/astral-sh/uv:latest
-                    shell: Sh
+                    image: python:3.12-slim
+                    shell: Bash
                     command: |-
+                      set -euo pipefail
+                      curl -LsSf https://astral.sh/uv/install.sh | sh
+                      export PATH="${HOME}/.local/bin:${PATH}"
+
                       cd python/datarobot-opentelemetry
                       uv build
                       echo "Build complete. Artifacts:"
@@ -47,9 +51,13 @@ pipeline:
                   identifier: Publish_to_Artifactory
                   spec:
                     connectorRef: account.dockerhub_datarobot_read
-                    image: ghcr.io/astral-sh/uv:latest
-                    shell: Sh
+                    image: python:3.12-slim
+                    shell: Bash
                     command: |-
+                      set -euo pipefail
+                      curl -LsSf https://astral.sh/uv/install.sh | sh
+                      export PATH="${HOME}/.local/bin:${PATH}"
+
                       cd python/datarobot-opentelemetry
                       PACKAGE_NAME=$(grep '^name' pyproject.toml | head -1 | awk -F'"' '{print $2}')
                       PACKAGE_VERSION=$(grep '^version' pyproject.toml | head -1 | awk -F'"' '{print $2}')
