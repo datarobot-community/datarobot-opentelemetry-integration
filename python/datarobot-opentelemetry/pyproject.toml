@@ -9,6 +9,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = []
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -17,6 +18,12 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+integrations = [
+    "opentelemetry-exporter-otlp-proto-http>=1.36.0",
+    "opentelemetry-sdk>=1.36.0",
 ]
 
 [project.urls]
