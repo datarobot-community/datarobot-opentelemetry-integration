@@ -172,7 +172,6 @@ def configure(
             configured_logger_provider.add_log_record_processor(
                 BatchLogRecordProcessor(log_exporter)
             )
-            logging.getLogger().setLevel(log_level)
             LoggingInstrumentor().instrument(
                 logger_provider=configured_logger_provider, log_level=log_level
             )

@@ -198,4 +198,223 @@ pipeline:
                 paths: []
               slsa_provenance:
                 enabled: false
+    - stage:
+        name: Integration Test
+        identifier: Integration_Test
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: true
+          buildIntelligence:
+            enabled: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.cigeneral
+              namespace: harness-delegate-ng
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      type: Background
+                      name: Start Elasticsearch
+                      identifier: Start_Elasticsearch
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/mirror_chainguard_datarobot.com_elasticsearch-iamguarded:9.2-drbuild-1048
+                        shell: Sh
+                        envVariables:
+                          TINI_SUBREAPER: "true"
+                          discovery.type: single-node
+                          xpack.security.enabled: "false"
+                          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+                          cluster.name: datarobot-opentelemetry-es-ci
+                          path.repo: /tmp/elasticsearch_backups
+                        resources:
+                          limits:
+                            memory: 1Gi
+                  - step:
+                      type: Background
+                      name: Start DrAuth Mock Server
+                      identifier: Start_DrAuth_Mock_Server
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: python:3.12
+                        shell: Sh
+                        command: python3 -m http.server 8880 --directory /tmp
+              - step:
+                  type: Run
+                  name: Wait for Elasticsearch
+                  identifier: Wait_for_Elasticsearch
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/curl
+                    shell: Sh
+                    command: |-
+                      counter=0
+                      while [[ $counter -lt 30 ]]; do
+                          if curl http://localhost:9200; then
+                              break
+                          else
+                              echo "Waiting for Elasticsearch to start..."
+                              counter=$((counter+1))
+                              sleep 10
+                          fi
+                      done
+
+                      if [[ $counter -eq 30 ]]; then
+                          echo "Error: Elasticsearch not available after 300 seconds"
+                          exit 1
+                      fi
+              - step:
+                  type: Run
+                  name: Wait for DrAuth Mock Server
+                  identifier: Wait_for_DrAuth_Mock_Server
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/curl
+                    shell: Sh
+                    command: |-
+                      counter=0
+                      while [[ $counter -lt 30 ]]; do
+                          if curl http://localhost:8880; then
+                              break
+                          else
+                              echo "Waiting for DrAuth Mock Server to start..."
+                              counter=$((counter+1))
+                              sleep 5
+                          fi
+                      done
+
+                      if [[ $counter -eq 30 ]]; then
+                          echo "Error: DrAuth Mock Server not available after 150 seconds"
+                          exit 1
+                      fi
+              - step:
+                  type: Run
+                  name: Run Datavolt Migrations
+                  identifier: Run_Datavolt_Migrations
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datavolt:latest
+                    shell: Sh
+                    envVariables:
+                      DATAVOLT_ELASTIC_SEARCH_LB_URL: http://localhost:9200
+                    command: |-
+                      esmigrate upgrade head -c /opt/migrations/esmigrate.ini
+                      export MIGRATIONS_EXIT_CODE=$?
+                      if [ $MIGRATIONS_EXIT_CODE -ne 0 ]; then
+                        echo "Datavolt migrations failed with exit code: $MIGRATIONS_EXIT_CODE"
+                        exit $MIGRATIONS_EXIT_CODE
+                      fi
+              - parallel:
+                  - step:
+                      type: Background
+                      name: Run Datavolt
+                      identifier: Run_Datavolt
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: datarobotdev/datavolt:latest
+                        shell: Sh
+                        envVariables:
+                          DATAVOLT_ELASTIC_SEARCH_URL: http://localhost:9200
+                        command: python3.12 -m datavolt.web
+                  - step:
+                      type: Run
+                      name: Wait for Datavolt
+                      identifier: Wait_for_Datavolt
+                      spec:
+                        connectorRef: account.dockerhub_datarobot_read
+                        image: alpine/curl
+                        shell: Sh
+                        command: |-
+                          counter=0
+                          while [[ $counter -lt 30 ]]; do
+                              if curl http://localhost:7000/health; then
+                                  break
+                              else
+                                  echo "Waiting for Datavolt to start..."
+                                  counter=$((counter+1))
+                                  sleep 10
+                              fi
+                          done
+                          if [[ $counter -eq 30 ]]; then
+                              echo "Error: Datavolt is not available after 300 seconds"
+                              exit 1
+                          fi
+              - step:
+                  type: Background
+                  name: Start OpenTelemetry Collector
+                  identifier: Start_OpenTelemetry_Collector
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datarobot-otel-collector:latest
+                    shell: Sh
+                    envVariables:
+                      ELASTICSEARCH_URL: http://localhost:9200
+                      ELASTICSEARCH_USERNAME: elastic
+                      ELASTICSEARCH_PASSWORD: elastic
+                      OTEL_BATCH_TIMEOUT: 1s
+                      OTEL_BATCH_SIZE: "1"
+                    command: /app/start_collector.sh
+                    resources:
+                      limits:
+                        memory: 2Gi
+                        cpu: "2"
+              - step:
+                  type: Run
+                  name: Wait for OpenTelemetry Collector
+                  identifier: Wait_for_OpenTelemetry_Collector
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: alpine/curl
+                    shell: Sh
+                    command: |-
+                      counter=0
+                      while [[ $counter -lt 30 ]]; do
+                          if curl http://localhost:13133; then
+                              break
+                          else
+                              echo "Waiting for OpenTelemetry Collector to start..."
+                              counter=$((counter+1))
+                              sleep 5
+                          fi
+                      done
+                      if [[ $counter -eq 30 ]]; then
+                          echo "Error: OpenTelemetry Collector is not available after 150 seconds"
+                          exit 1
+                      fi
+              - step:
+                  type: Run
+                  name: Run Integration Tests
+                  identifier: Run_Integration_Tests
+                  spec:
+                    connectorRef: account.dockerhub_datarobot_read
+                    image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
+                    shell: Sh
+                    command: |-
+                      echo "Running integration tests"
+                      cd python/datarobot-opentelemetry
+                      uv run --no-sync pytest -svvv tests/integration --junitxml=/harness/test_results/integration-test-results.xml
+                    envVariables:
+                      DR_OTEL_ENDPOINT: http://localhost:4318
+                      DR_ENTITY_TYPE: deployment
+                      DR_ENTITY_ID: 68af4e4dab41f0ebc9badb49
+                      DR_API_BASE_URL: http://localhost:7000
+                      DR_ORG_ID: 57eb3347d75f1670ebc5c4bd
+                      DATAROBOT_API_TOKEN: datavolt
+                      DATAVOLT_URL: http://localhost:7000
+                      DATAVOLT_USER: datavolt
+                      DATAVOLT_PASSWORD: datavolt
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - /harness/test_results/integration-test-results.xml
             description: ""
