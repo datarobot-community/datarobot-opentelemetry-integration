@@ -22,7 +22,7 @@ with open(getenv("MOCK_AUTH_SERVER_AUTH_RESPONSE_JSON_PATH", "tests/auth_respons
 
 
 with open(
-    getenv("MOCK_AUTH_SERVER_AUTH_RESPONSE_JSON_PATH", "tests/entitlement_response.json"), "r"
+    getenv("MOCK_AUTH_SERVER_ENTITLEMENT_RESPONSE_JSON_PATH", "tests/entitlement_response.json"), "r"
 ) as f:
     ENTITLEMENT_RESOURCE = json.load(f)
 
