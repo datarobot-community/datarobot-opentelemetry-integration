@@ -1,0 +1,12 @@
+{
+    "entitlements": [
+        {
+            "name": "ENABLE_MLOPS",
+            "value": true
+        },
+        {
+            "name": "ENABLE_GENAI_EXPERIMENTATION",
+            "value": true
+        }
+    ]
+}

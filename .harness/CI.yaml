@@ -357,9 +357,19 @@ pipeline:
                     image: datarobotdev/datarobot-otel-collector:latest
                     shell: Sh
                     envVariables:
+                      OTEL_CONFIG: collector-gateway-config.yaml
                       ELASTICSEARCH_URL: http://localhost:9200
                       ELASTICSEARCH_USERNAME: elastic
                       ELASTICSEARCH_PASSWORD: elastic
+                      DR_AUTH_SERVER_URL: http://localhost:8880
+                      DR_AUTH_TOKEN_ENDPOINT_URI: http://localhost:8880/token
+                      DR_AUTH_CLIENT_ID: clientID
+                      DR_AUTH_CLIENT_SECRET: Secret
+                      DR_AUTH_RETRIES_COUNT: "5"
+                      DR_AUTH_FEATURE_FLAGS: ENABLE_MLOPS,ENABLE_GENAI_EXPERIMENTATION
+                      DR_AUTH_ENTITY_HEADER: X-DataRobot-Entity-Id
+                      DR_AUTH_CACHE_SIZE_IN_MEGABYTES: "32"
+                      DR_AUTH_CACHE_TTL_IN_MINUTES: "5"
                       OTEL_BATCH_TIMEOUT: 1s
                       OTEL_BATCH_SIZE: "1"
                     command: /app/start_collector.sh
