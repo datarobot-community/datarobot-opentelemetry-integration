@@ -14,9 +14,19 @@
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional, cast
 
+from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ConfigureResult:
+    tracing_configured: bool
+    metrics_configured: bool
+    logger_configured: bool
 
 
 def configure(
@@ -26,7 +36,7 @@ def configure(
     api_key: Optional[str] = None,
     log_level: int = logging.INFO,
     metrics_export_interval: int = 60000,
-) -> bool:
+) -> ConfigureResult:
     """
     Configures the OpenTelemetry integration with the provided parameters.
 
@@ -38,7 +48,7 @@ def configure(
         log_level (int): The logging level for the OpenTelemetry integration. Defaults to logging.INFO.
         metrics_export_interval (int): The interval in milliseconds for exporting metrics. Defaults to 60000.
     Returns:
-        bool: True if the configuration was successful, False otherwise.
+        ConfigureResult: An object indicating which signals were successfully configured.
     """
     # Ensure that OpenTelemetry dependencies are available before proceeding with configuration.
     try:
@@ -59,12 +69,14 @@ def configure(
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
+        from opentelemetry.instrumentation.logging import (
+            LoggingInstrumentor,
+        )
         from opentelemetry.metrics._internal import (
             _ProxyMeterProvider,
         )
         from opentelemetry.sdk._logs import (
             LoggerProvider,
-            LoggingHandler,
         )
         from opentelemetry.sdk._logs.export import (
             BatchLogRecordProcessor,
@@ -101,9 +113,22 @@ def configure(
         )
 
     otel_headers = {
-        "X-DataRobot-Entity-Id": f"{entity_type}-{entity_id}",
-        "X-DataRobot-Api-Key": api_key,
+        DataRobotOtelHeaders.ENTITY_ID: f"{entity_type}-{entity_id}",
+        DataRobotOtelHeaders.API_KEY: api_key,
     }
+
+    base_endpoint = endpoint.rstrip("/")
+
+    def _signal_endpoint(signal: str) -> str:
+        suffix = f"/v1/{signal}"
+        if base_endpoint.endswith(suffix):
+            return base_endpoint
+        return f"{base_endpoint}{suffix}"
+
+    tracing_configured = False
+    metrics_configured = False
+    logger_configured = False
+
     # Configure tracing
     try:
         trace_provider = cast(TracerProvider, trace.get_tracer_provider())
@@ -114,12 +139,15 @@ def configure(
         ):
             # Safe to set TracerProvider since none exists yet
             trace_resource = Resource.create({"datarobot.service.priority": "p1"})
-            trace_exporter = OTLPSpanExporter(endpoint=endpoint, headers=otel_headers)
+            trace_exporter = OTLPSpanExporter(
+                endpoint=_signal_endpoint("traces"), headers=otel_headers
+            )
             configured_trace_provider = TracerProvider(resource=trace_resource)
             configured_trace_provider.add_span_processor(
                 BatchSpanProcessor(trace_exporter)
             )
             trace.set_tracer_provider(configured_trace_provider)
+            tracing_configured = True
         else:
             logger.warning(
                 "Opentelemetry TracerProvider is already configured and in use. Skipping Otel configuration for DataRobot to avoid conflicts."
@@ -138,18 +166,18 @@ def configure(
             configured_logger_provider = LoggerProvider(resource=logger_resource)
             _logs.set_logger_provider(configured_logger_provider)
 
-            log_exporter = OTLPLogExporter()
+            log_exporter = OTLPLogExporter(
+                endpoint=_signal_endpoint("logs"), headers=otel_headers
+            )
             configured_logger_provider.add_log_record_processor(
                 BatchLogRecordProcessor(log_exporter)
             )
-
-            handler = LoggingHandler(
-                level=log_level, logger_provider=configured_logger_provider
-            )
-            # Set the root logger level to the specified log level
             logging.getLogger().setLevel(log_level)
-            # Attach OTLP handler to root logger
-            logging.getLogger().addHandler(handler)
+            LoggingInstrumentor().instrument(
+                logger_provider=configured_logger_provider, log_level=log_level
+            )
+
+            logger_configured = True
 
         else:
             logger.warning(
@@ -164,7 +192,7 @@ def configure(
         # Check if Metrics is uninitialized
         if isinstance(meter_provider_current, _ProxyMeterProvider):
             metric_exporter = OTLPMetricExporter(
-                endpoint=endpoint, headers=otel_headers
+                endpoint=_signal_endpoint("metrics"), headers=otel_headers
             )
             metric_reader = PeriodicExportingMetricReader(
                 metric_exporter, export_interval_millis=metrics_export_interval
@@ -174,10 +202,14 @@ def configure(
                 metric_readers=[metric_reader], resource=metric_resource
             )
             metrics.set_meter_provider(configured_meter_provider)
+            metrics_configured = True
         else:
             logger.warning("OTEL MeterProvider already set. Cannot override.")
-            return False
     except Exception as e:
         logger.warning("Failed to initialize MetricsProvider for DataRobot", exc_info=e)
 
-    return True
+    return ConfigureResult(
+        tracing_configured=tracing_configured,
+        metrics_configured=metrics_configured,
+        logger_configured=logger_configured,
+    )

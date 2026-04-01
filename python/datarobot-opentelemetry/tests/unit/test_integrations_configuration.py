@@ -76,6 +76,10 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
         def emit(self, record: logging.LogRecord) -> None:
             return None
 
+    class LoggingInstrumentor:
+        def instrument(self, **_kwargs: object) -> None:
+            return None
+
     class BatchLogRecordProcessor:
         def __init__(self, exporter: object) -> None:
             self.exporter = exporter
@@ -85,15 +89,17 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
             self.exporter = exporter
 
     class OTLPSpanExporter:
-        def __init__(self, endpoint: str, headers: dict[str, str]) -> None:
+        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
             self.endpoint = endpoint
             self.headers = headers
 
     class OTLPLogExporter:
-        pass
+        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
+            self.endpoint = endpoint
+            self.headers = headers
 
     class OTLPMetricExporter:
-        def __init__(self, endpoint: str, headers: dict[str, str]) -> None:
+        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
             self.endpoint = endpoint
             self.headers = headers
 
@@ -132,7 +138,12 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
 
     sdk_logs_module = add_module("opentelemetry.sdk._logs")
     sdk_logs_module.LoggerProvider = LoggerProvider
-    sdk_logs_module.LoggingHandler = LoggingHandler
+
+    instrumentation_module = add_module("opentelemetry.instrumentation")
+    instrumentation_logging_module = add_module("opentelemetry.instrumentation.logging")
+    instrumentation_logging_module.LoggingHandler = LoggingHandler
+    instrumentation_logging_module.LoggingInstrumentor = LoggingInstrumentor
+    instrumentation_module.logging = instrumentation_logging_module
 
     logs_internal_module = add_module("opentelemetry._logs._internal")
     logs_internal_module.ProxyLoggerProvider = ProxyLoggerProvider
@@ -193,4 +204,7 @@ def test_configure_raises_actionable_error_when_opentelemetry_missing(monkeypatc
 def test_configure_succeeds_with_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_opentelemetry(monkeypatch)
 
-    assert configure("https://example.test", "deployment", "abc-123", api_key="token") is True
+    from datarobot_opentelemetry.integrations import ConfigureResult
+
+    result = configure("https://example.test", "deployment", "abc-123", api_key="token")
+    assert result == ConfigureResult(tracing_configured=True, metrics_configured=True, logger_configured=True)

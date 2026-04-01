@@ -1,3 +1,3 @@
-from .confgiuration import configure
+from .confgiuration import ConfigureResult, configure
 
-__all__ = ["configure"]
+__all__ = ["configure", "ConfigureResult"]
