@@ -245,9 +245,9 @@ pipeline:
                       identifier: Start_DrAuth_Mock_Server
                       spec:
                         connectorRef: account.dockerhub_datarobot_read
-                        image: python:3.12
+                        image: datarobotdev/datarobot-opentelemetry:ci-python-<+pipeline.stages.Git_Hash.spec.execution.steps.Git_Hash.output.outputVariables.GIT_HASH_SHORT>
                         shell: Sh
-                        command: python3 -m http.server 8880 --directory /tmp
+                        command: python3 tests/mock_auth_server.py
               - step:
                   type: Run
                   name: Wait for Elasticsearch
