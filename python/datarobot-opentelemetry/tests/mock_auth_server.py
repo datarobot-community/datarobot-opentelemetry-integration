@@ -108,7 +108,7 @@ class AuthHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode("utf-8"))
 
 
-def run_server(host: str = "localhost", port: int = 80) -> None:
+def run_server(host: str = "localhost", port: int = 8880) -> None:
     server_address = (host, port)
     httpd = HTTPServer(server_address, AuthHandler)
     print(f"Server running at http://{host}:{port}")

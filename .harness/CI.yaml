@@ -357,6 +357,7 @@ pipeline:
                     image: datarobotdev/datarobot-otel-collector:latest
                     shell: Sh
                     envVariables:
+                      OTEL_CONFIG: collector-exporter-config.yaml
                       ELASTICSEARCH_URL: http://localhost:9200
                       ELASTICSEARCH_USERNAME: elastic
                       ELASTICSEARCH_PASSWORD: doesntmatter
