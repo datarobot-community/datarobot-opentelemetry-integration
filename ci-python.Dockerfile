@@ -25,7 +25,8 @@ COPY python/datarobot-opentelemetry .
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN git config --global --add safe.directory /opt/app && \
     uv version -- $APP_VERSION && \
-    uv sync --frozen --no-cache
+    uv sync --frozen --no-cache && \
+    uv sync --extra integrations --frozen
 
 ENV RUFF_CACHE_DIR=/tmp
 USER nonroot

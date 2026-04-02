@@ -409,7 +409,6 @@ pipeline:
                     command: |-
                       echo "Syncing integration dependencies"
                       cd python/datarobot-opentelemetry
-                      uv sync --extra integrations --frozen
 
                       echo "Running integration tests"
                       uv run --no-sync pytest -svvv --cache-dir=/tmp/.pytest_cache tests/integration --junitxml=/harness/test_results/integration-test-results.xml
