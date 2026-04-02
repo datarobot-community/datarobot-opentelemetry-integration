@@ -343,6 +343,7 @@ def test_emit_log(
     test_run_id: str,
 ):
     log = logging.getLogger("integration-test")
+    log.setLevel(logging.INFO)
     log.info(
         "Integration test log record",
         extra={
