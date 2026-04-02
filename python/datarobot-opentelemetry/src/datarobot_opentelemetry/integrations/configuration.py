@@ -164,7 +164,6 @@ def configure(
         if isinstance(logger_provider_current, ProxyLoggerProvider):
             logger_resource = Resource.create({"datarobot.service.priority": "p1"})
             configured_logger_provider = LoggerProvider(resource=logger_resource)
-            _logs.set_logger_provider(configured_logger_provider)
 
             log_exporter = OTLPLogExporter(
                 endpoint=_signal_endpoint("logs"), headers=otel_headers
@@ -175,6 +174,7 @@ def configure(
             LoggingInstrumentor().instrument(
                 logger_provider=configured_logger_provider, log_level=log_level
             )
+            _logs.set_logger_provider(configured_logger_provider)
 
             logger_configured = True
 
