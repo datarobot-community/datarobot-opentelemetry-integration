@@ -350,14 +350,14 @@ pipeline:
                           fi
               - step:
                   type: Background
-                  name: Start OpenTelemetry Collector
-                  identifier: Start_OpenTelemetry_Collector
+                  name: Start datarobot-otel-collector
+                  identifier: Start_datarobototelcollector
                   spec:
                     connectorRef: account.dockerhub_datarobot_read
                     image: datarobotdev/datarobot-otel-collector:latest
                     shell: Sh
+                    command: /app/start_collector.sh
                     envVariables:
-                      OTEL_CONFIG: collector-exporter-config.yaml
                       ELASTICSEARCH_URL: http://localhost:9200
                       ELASTICSEARCH_USERNAME: elastic
                       ELASTICSEARCH_PASSWORD: doesntmatter
@@ -371,7 +371,6 @@ pipeline:
                       DR_AUTH_VERIFY_PERMISSIONS: "true"
                       DR_AUTH_FEATURE_FLAGS: ENABLE_MLOPS,ENABLE_GENAI_EXPERIMENTATION
                       DR_AUTH_ENTITY_HEADER: X-DataRobot-Entity-Id
-                    command: /app/start_collector.sh
                     resources:
                       limits:
                         memory: 2Gi
