@@ -16,22 +16,37 @@ from datetime import timedelta
 from http.server import HTTPServer
 from http.server import SimpleHTTPRequestHandler
 from os import getenv
+from pathlib import Path
 
-with open(getenv("MOCK_AUTH_SERVER_AUTH_RESPONSE_JSON_PATH", "tests/auth_response.json"), "r") as f:
+FIXTURES_DIR = Path(__file__).resolve().parent
+
+
+def _fixture_path(env_var: str, default_filename: str) -> Path:
+    configured = getenv(env_var)
+    if configured:
+        path = Path(configured)
+        return path if path.is_absolute() else FIXTURES_DIR / path
+    return FIXTURES_DIR / default_filename
+
+
+with open(
+    _fixture_path("MOCK_AUTH_SERVER_AUTH_RESPONSE_JSON_PATH", "auth_response.json"), "r", encoding="utf-8"
+) as f:
     AUTH_RESPONSE = json.load(f)
 
 
 with open(
-    getenv("MOCK_AUTH_SERVER_ENTITLEMENT_RESPONSE_JSON_PATH", "tests/entitlement_response.json"), "r"
+    _fixture_path("MOCK_AUTH_SERVER_ENTITLEMENT_RESPONSE_JSON_PATH", "entitlement_response.json"),
+    "r",
+    encoding="utf-8",
 ) as f:
     ENTITLEMENT_RESOURCE = json.load(f)
 
 
 with open(
-    getenv(
-        "MOCK_AUTH_SERVER_ACESS_CONTROL_RESOURCE_JSON_PATH", "tests/access_control_resource.json"
-    ),
+    _fixture_path("MOCK_AUTH_SERVER_ACESS_CONTROL_RESOURCE_JSON_PATH", "access_control_resource.json"),
     "r",
+    encoding="utf-8",
 ) as f:
     ACCESS_CONTROL_RESOURCE = json.load(f)
 
