@@ -154,7 +154,7 @@ def configure(
             trace.set_tracer_provider(configured_trace_provider)
             tracing_configured = True
         else:
-            logger.info("Opentelemetry TracerProvider is already configured and")
+            logger.info("Opentelemetry TracerProvider is already configured.")
             if hasattr(trace_provider, "add_span_processor"):
                 logger.info("Adding span processor to existing TracerProvider.")
                 trace_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
@@ -185,7 +185,7 @@ def configure(
             logger_configured = True
 
         else:
-            logger.info("OTEL LoggerProvider is already configured and in use.")
+            logger.info("OTEL LoggerProvider is already configured.")
             if hasattr(logger_provider_current, "add_log_record_processor"):
                 logger.info("Adding log record processor to existing LoggerProvider.")
                 logger_provider_current.add_log_record_processor(
