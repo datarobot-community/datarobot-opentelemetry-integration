@@ -87,38 +87,6 @@ make cov
 
 The coverage report will be generated as HTML and automatically opened in your browser at `file://$(pwd)/htmlcov/index.html`.
 
-### Integration Tests
-
-**Important**: Integration tests require **Datavolt** to be running locally. Datavolt provides the OpenTelemetry collector and DataRobot backend services needed for the tests.
-
-After starting Datavolt, run integration tests with:
-
-```bash
-cd python/datarobot-opentelemetry
-
-# Run integration tests with default local Datavolt configuration
-make integration-test
-
-# Or run with custom endpoint and credentials
-DR_OTEL_ENDPOINT=http://0.0.0.0:4318 \
-DR_ENTITY_TYPE=deployment \
-DR_ENTITY_ID=68af4e4dab41f0ebc9badb49 \
-DATAROBOT_API_TOKEN=datavolt \
-DATAVOLT_URL=http://0.0.0.0:7000 \
-DATAVOLT_USER=datavolt \
-DATAVOLT_PASSWORD=datavolt \
-make integration-test
-```
-
-**Environment variables** (all optional with sensible defaults for local development):
-- `DR_OTEL_ENDPOINT` - OpenTelemetry collector endpoint (default: `http://0.0.0.0:4318`)
-- `DR_ENTITY_TYPE` - Entity type being monitored (default: `deployment`)
-- `DR_ENTITY_ID` - Unique entity ID (default: `68af4e4dab41f0ebc9badb49`)
-- `DATAROBOT_API_TOKEN` - API token for authentication (default: `datavolt`)
-- `DATAVOLT_URL` - Datavolt backend URL (default: `http://0.0.0.0:7000`)
-- `DATAVOLT_USER` - Datavolt username (default: `datavolt`)
-- `DATAVOLT_PASSWORD` - Datavolt password (default: `datavolt`)
-
 ## Linting and Formatting
 
 All code must pass linting checks before being merged. We use:

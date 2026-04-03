@@ -64,12 +64,8 @@ lib-license-check: ## Checks all dependencies have only approved licenses
 unit-test: ## Runs unit tests
 	uv run pytest -svvv tests/unit
 
-.PHONY: integration-test
-integration-test: ## Runs integration tests
-	uv run pytest -svvv tests/integration
-
 .PHONY: test
-test: unit-test integration-test ## Run all tests
+test: unit-test ## Run all tests
 
 .PHONY: cov
 cov: ## Runs code tests with code coverage

@@ -129,29 +129,36 @@ def configure(
     metrics_configured = False
     logger_configured = False
 
+    base_resource = Resource.create(
+        {
+            "datarobot.service.priority": "p1",
+        }
+    )
+
     # Configure tracing
     try:
         trace_provider = cast(TracerProvider, trace.get_tracer_provider())
         tracer = trace_provider.get_tracer(__name__)
         internal_tracer = getattr(tracer, "_tracer", None)
+        trace_exporter = OTLPSpanExporter(
+            endpoint=_signal_endpoint("traces"), headers=otel_headers
+        )
         if isinstance(trace_provider, ProxyTracerProvider) and isinstance(
             internal_tracer, NoOpTracer
         ):
             # Safe to set TracerProvider since none exists yet
-            trace_resource = Resource.create({"datarobot.service.priority": "p1"})
-            trace_exporter = OTLPSpanExporter(
-                endpoint=_signal_endpoint("traces"), headers=otel_headers
-            )
-            configured_trace_provider = TracerProvider(resource=trace_resource)
+            configured_trace_provider = TracerProvider(resource=base_resource)
             configured_trace_provider.add_span_processor(
                 BatchSpanProcessor(trace_exporter)
             )
             trace.set_tracer_provider(configured_trace_provider)
             tracing_configured = True
         else:
-            logger.warning(
-                "Opentelemetry TracerProvider is already configured and in use. Skipping Otel configuration for DataRobot to avoid conflicts."
-            )
+            logger.info("Opentelemetry TracerProvider is already configured and")
+            if hasattr(trace_provider, "add_span_processor"):
+                logger.info("Adding span processor to existing TracerProvider.")
+                trace_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
+                tracing_configured = True
 
     except Exception as e:
         logger.warning("Failed to initialize TraceProvider for DataRobot", exc_info=e)
@@ -161,13 +168,12 @@ def configure(
         logger_provider_current = _logs.get_logger_provider()
 
         # Check if Logs provider is uninitialized
+        log_exporter = OTLPLogExporter(
+            endpoint=_signal_endpoint("logs"), headers=otel_headers
+        )
         if isinstance(logger_provider_current, ProxyLoggerProvider):
-            logger_resource = Resource.create({"datarobot.service.priority": "p1"})
-            configured_logger_provider = LoggerProvider(resource=logger_resource)
+            configured_logger_provider = LoggerProvider(resource=base_resource)
 
-            log_exporter = OTLPLogExporter(
-                endpoint=_signal_endpoint("logs"), headers=otel_headers
-            )
             configured_logger_provider.add_log_record_processor(
                 BatchLogRecordProcessor(log_exporter)
             )
@@ -179,9 +185,13 @@ def configure(
             logger_configured = True
 
         else:
-            logger.warning(
-                "OTEL LoggerProvider is already configured and in use. Skipping Otel configuration for DataRobot to avoid conflicts."
-            )
+            logger.info("OTEL LoggerProvider is already configured and in use.")
+            if hasattr(logger_provider_current, "add_log_record_processor"):
+                logger.info("Adding log record processor to existing LoggerProvider.")
+                logger_provider_current.add_log_record_processor(
+                    BatchLogRecordProcessor(log_exporter)
+                )
+                logger_configured = True
     except Exception as e:
         logger.warning("Failed to initialize LoggerProvider for DataRobot", exc_info=e)
 
@@ -196,9 +206,8 @@ def configure(
             metric_reader = PeriodicExportingMetricReader(
                 metric_exporter, export_interval_millis=metrics_export_interval
             )
-            metric_resource = Resource.create({"datarobot.service.priority": "p1"})
             configured_meter_provider = MeterProvider(
-                metric_readers=[metric_reader], resource=metric_resource
+                metric_readers=[metric_reader], resource=base_resource
             )
             metrics.set_meter_provider(configured_meter_provider)
             metrics_configured = True
