@@ -30,9 +30,9 @@ class ConfigureResult:
 
 
 def configure(
-    endpoint: str,
-    entity_type: str,
-    entity_id: str,
+    endpoint: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
     api_key: Optional[str] = None,
     log_level: int = logging.INFO,
     metrics_export_interval: int = 60000,
@@ -110,6 +110,21 @@ def configure(
     if not api_key:
         raise ValueError(
             "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
+        )
+    endpoint = endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        raise ValueError(
+            "Endpoint is required for telemetry export. Provide it as an argument or set the OTEL_EXPORTER_OTLP_ENDPOINT environment variable."
+        )
+    entity_type = entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
+    if not entity_type:
+        raise ValueError(
+            "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
+        )
+    entity_id = entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
+    if not entity_id:
+        raise ValueError(
+            "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
         )
 
     otel_headers = {

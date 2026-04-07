@@ -51,10 +51,10 @@ from datarobot_opentelemetry.integrations import configure
 
 # Configure the OpenTelemetry integration
 result = configure(
-    endpoint="https://your-telemetry-endpoint.example.com",
-    entity_type="deployment",
-    entity_id="your-entity-id",
-    api_key="your-api-key"  # alternatively, set DATAROBOT_API_TOKEN env var
+    endpoint="https://your-telemetry-endpoint.example.com",  # optional if OTEL_EXPORTER_OTLP_ENDPOINT is set
+    entity_type="deployment",  # optional if DATAROBOT_ENTITY_TYPE is set
+    entity_id="your-entity-id",  # optional if DATAROBOT_ENTITY_ID is set
+    api_key="your-api-key",  # optional if DATAROBOT_API_TOKEN is set
 )
 
 # Check configuration results
@@ -63,14 +63,31 @@ print(f"Metrics configured: {result.metrics_configured}")
 print(f"Logging configured: {result.logger_configured}")
 ```
 
+You can also configure entirely from environment variables:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://your-telemetry-endpoint.example.com"
+export DATAROBOT_ENTITY_TYPE="deployment"
+export DATAROBOT_ENTITY_ID="your-entity-id"
+export DATAROBOT_API_TOKEN="your-api-key"
+```
+
+```python
+from datarobot_opentelemetry.integrations import configure
+
+result = configure()
+```
+
 ### Configuration parameters
 
-- **endpoint** (required): The OTLP HTTP endpoint URL for telemetry data
-- **entity_type** (required): Type of entity being monitored (e.g., "deployment", "workload")
-- **entity_id** (required): Unique identifier for the entity
-- **api_key** (optional): API key for authentication. If not provided, uses `DATAROBOT_API_TOKEN` environment variable
+- **endpoint** (optional argument, required value): OTLP HTTP endpoint URL for telemetry data. If not passed, uses `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- **entity_type** (optional argument, required value): Type of entity being monitored (e.g., "deployment", "workload"). If not passed, uses `DATAROBOT_ENTITY_TYPE`.
+- **entity_id** (optional argument, required value): Unique identifier for the entity. If not passed, uses `DATAROBOT_ENTITY_ID`.
+- **api_key** (optional argument, required value): API key for authentication. If not passed, uses `DATAROBOT_API_TOKEN`.
 - **log_level** (optional): Logging level for the integration (default: `logging.INFO`)
 - **metrics_export_interval** (optional): Interval in milliseconds for exporting metrics (default: 60000)
+
+Argument values take precedence over environment variables.
 
 ### Advanced usage
 
