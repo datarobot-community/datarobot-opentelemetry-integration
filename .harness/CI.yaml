@@ -198,4 +198,3 @@ pipeline:
                 paths: []
               slsa_provenance:
                 enabled: false
-            description: ""

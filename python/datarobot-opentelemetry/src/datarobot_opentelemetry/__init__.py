@@ -5,6 +5,6 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0"  # package not installed
 
-from datarobot_opentelemetry.semconv import SpanAttributes
+from datarobot_opentelemetry.semconv import DataRobotOtelHeaders, SpanAttributes
 
-__all__ = ["SpanAttributes", "__version__"]
+__all__ = ["SpanAttributes", "DataRobotOtelHeaders", "__version__"]

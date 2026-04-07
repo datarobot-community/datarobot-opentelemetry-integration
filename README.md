@@ -72,14 +72,14 @@ TODO: Add basic usage examples and common integration patterns.
 
 ## Testing
 
-### Run Tests
+### Unit Tests
 
 ```bash
-# Run all unit tests
-make test
-
-# Run tests with verbose output
+# Run unit tests only
 make unit-test
+
+# Run all tests (unit + integration)
+make test
 
 # Run tests with coverage report
 make cov
