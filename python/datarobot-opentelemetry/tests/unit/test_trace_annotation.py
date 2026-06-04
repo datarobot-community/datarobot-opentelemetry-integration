@@ -25,7 +25,6 @@ def memory_exporter() -> InMemorySpanExporter:
 
 @pytest.fixture
 def tracer(memory_exporter: InMemorySpanExporter) -> Tracer:
-    memory_exporter = InMemorySpanExporter()
     tracer_provider = TracerProvider()
     span_processor = SimpleSpanProcessor(memory_exporter)
     tracer_provider.add_span_processor(span_processor)
