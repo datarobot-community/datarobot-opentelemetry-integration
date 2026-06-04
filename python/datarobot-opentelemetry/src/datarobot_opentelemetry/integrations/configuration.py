@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Optional, cast
 
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
+from datarobot_opentelemetry.semconv.traces import TRACER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ def configure(
     # Configure tracing
     try:
         trace_provider = cast(TracerProvider, trace.get_tracer_provider())
-        tracer = trace_provider.get_tracer(__name__)
+        tracer = trace_provider.get_tracer(TRACER_NAME)
         internal_tracer = getattr(tracer, "_tracer", None)
         trace_exporter = OTLPSpanExporter(
             endpoint=_signal_endpoint("traces"), headers=otel_headers

@@ -12,6 +12,8 @@
 
 from typing import Final
 
+TRACER_NAME = "datarobot"
+
 
 class SpanAttributes:
     """Constants for span attribute keys used in Gen AI telemetry."""
