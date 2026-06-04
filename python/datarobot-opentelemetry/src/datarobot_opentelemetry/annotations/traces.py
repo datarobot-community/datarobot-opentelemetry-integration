@@ -34,7 +34,8 @@ def otel_span(
         _name = name or func.__name__
         _tracer = tracer or get_tracer_provider().get_tracer(TRACER_NAME)
 
-        def _set_attributes(s, attributes: Optional[dict[str, str]]):
+        def _set_attributes(s):
+            """Use outer `attributes` to set the span attributes."""
             for k, v in (attributes or {}).items():
                 s.set_attribute(k, v)
 
@@ -54,7 +55,7 @@ def otel_span(
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 with _tracer.start_as_current_span(_name) as span:
-                    _set_attributes(span, attributes)
+                    _set_attributes(span)
                     return await func(*args, **kwargs)
 
             return async_wrapper
@@ -62,7 +63,7 @@ def otel_span(
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             with _tracer.start_as_current_span(_name) as span:
-                _set_attributes(span, attributes)
+                _set_attributes(span)
                 return func(*args, **kwargs)
 
         return sync_wrapper
