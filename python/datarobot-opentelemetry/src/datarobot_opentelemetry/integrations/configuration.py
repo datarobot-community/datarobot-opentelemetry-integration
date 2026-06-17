@@ -15,7 +15,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import Optional, Tuple, cast
 
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
@@ -27,6 +27,21 @@ class ConfigureResult:
     tracing_configured: bool
     metrics_configured: bool
     logger_configured: bool
+
+
+def _parse_dr_env_vars() -> Tuple[str | None, str | None]:
+    env_var_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS") or ""
+    env_headers = {}
+
+    for item in env_var_headers.split(","):
+        if "=" in item:
+            key, value = item.split("=", 1)
+            env_headers[key.strip().lower()] = value
+
+    dr_service_name = env_headers.get(DataRobotOtelHeaders.ENTITY_ID.lower())
+    dr_api_key = env_headers.get(DataRobotOtelHeaders.API_KEY.lower())
+
+    return dr_service_name, dr_api_key
 
 
 def configure(
@@ -106,31 +121,38 @@ def configure(
             "Install with: pip install 'datarobot-opentelemetry[integrations]'"
         ) from exc
 
-    api_key = api_key or os.environ.get("DATAROBOT_API_TOKEN")
-    if not api_key:
-        raise ValueError(
-            "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
-        )
+    dr_service_name, dr_api_key = _parse_dr_env_vars()
+
+    if not dr_api_key or api_key:
+        api_key = api_key or os.environ.get("DATAROBOT_API_TOKEN")
+        if not api_key:
+            raise ValueError(
+                "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
+            )
+
     endpoint = endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not endpoint:
         raise ValueError(
             "Endpoint is required for telemetry export. Provide it as an argument or set the OTEL_EXPORTER_OTLP_ENDPOINT environment variable."
         )
-    entity_type = entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
-    if not entity_type:
-        raise ValueError(
-            "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
-        )
-    entity_id = entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
-    if not entity_id:
-        raise ValueError(
-            "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
-        )
 
-    otel_headers = {
-        DataRobotOtelHeaders.ENTITY_ID: f"{entity_type}-{entity_id}",
-        DataRobotOtelHeaders.API_KEY: api_key,
-    }
+    if not dr_service_name or (entity_type and entity_id):
+        entity_type = entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
+        if not entity_type:
+            raise ValueError(
+                "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
+            )
+        entity_id = entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
+        if not entity_id:
+            raise ValueError(
+                "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
+            )
+
+    otel_headers: dict[str, str] = {}
+    if entity_type and entity_id:
+        otel_headers[DataRobotOtelHeaders.ENTITY_ID] = f"{entity_type}-{entity_id}"
+    if api_key:
+        otel_headers[DataRobotOtelHeaders.API_KEY] = api_key
 
     base_endpoint = endpoint.rstrip("/")
 

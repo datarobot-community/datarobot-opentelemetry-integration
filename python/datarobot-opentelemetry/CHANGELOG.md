@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.1] - 2026-06-017
+
+### Added
+
+- Respect `X-DataRobot-Entity-Id` and `X-DataRobot-Api-Key` DataRobot specific headers
+  if provided via `OTEL_EXPORTER_OTLP_HEADERS` environment variable.
+
 ## [0.2.0] - 2026-04-01
 
 ### Added
