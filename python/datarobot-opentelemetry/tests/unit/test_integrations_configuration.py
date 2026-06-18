@@ -18,11 +18,10 @@ import types
 import pytest
 
 from datarobot_opentelemetry.integrations import configure
-from datarobot_opentelemetry.integrations.configuration import _parse_dr_env_vars
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
-ENTITY_HEADER = DataRobotOtelHeaders.ENTITY_ID
-API_KEY_HEADER = DataRobotOtelHeaders.API_KEY
+ENTITY_HEADER = DataRobotOtelHeaders.ENTITY_ID.lower()
+API_KEY_HEADER = DataRobotOtelHeaders.API_KEY.lower()
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +44,10 @@ def _trace_exporter_headers() -> dict[str, str]:
 
 
 def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Capture the real header parser before we shadow the opentelemetry package
+    # so the configuration code can still parse OTEL_EXPORTER_OTLP_HEADERS.
+    from opentelemetry.util.re import parse_env_headers as real_parse_env_headers
+
     modules: dict[str, types.ModuleType] = {}
 
     def add_module(name: str) -> types.ModuleType:
@@ -235,52 +238,10 @@ def test_configure_succeeds_with_fake_opentelemetry(monkeypatch: pytest.MonkeyPa
     assert result == ConfigureResult(tracing_configured=True, metrics_configured=True, logger_configured=True)
 
 
-class TestParseDrEnvVars:
-    def test_returns_none_when_header_env_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
-        assert _parse_dr_env_vars() == (None, None)
-
-    def test_returns_none_when_header_env_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "")
-        assert _parse_dr_env_vars() == (None, None)
-
-    def test_parses_entity_id_and_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_HEADERS",
-            f"{ENTITY_HEADER}=deployment-123,{API_KEY_HEADER}=secret",
-        )
-        assert _parse_dr_env_vars() == ("deployment-123", "secret")
-
-    def test_header_keys_are_case_insensitive_and_trimmed(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_HEADERS",
-            f" {ENTITY_HEADER.upper()} =deployment-123, {API_KEY_HEADER.lower()}=secret",
-        )
-        assert _parse_dr_env_vars() == ("deployment-123", "secret")
-
-    def test_ignores_items_without_equals(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_HEADERS",
-            f"garbage,{ENTITY_HEADER}=deployment-123",
-        )
-        assert _parse_dr_env_vars() == ("deployment-123", None)
-
-    def test_value_may_contain_equals_sign(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_HEADERS",
-            f"{API_KEY_HEADER}=a=b=c",
-        )
-        assert _parse_dr_env_vars() == (None, "a=b=c")
-
-    def test_returns_none_for_unrelated_headers(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Bearer xyz")
-        assert _parse_dr_env_vars() == (None, None)
-
-
 def test_configure_uses_identity_from_otlp_headers_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """When OTLP headers already carry the entity id and api key, configure
-    should not require the DATAROBOT_* args/env vars and should not duplicate
-    those values into the per-signal exporter headers."""
+    should not require the DATAROBOT_* args/env vars and should forward those
+    values to the per-signal exporter headers."""
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.setenv(
         "OTEL_EXPORTER_OTLP_HEADERS",
@@ -292,7 +253,10 @@ def test_configure_uses_identity_from_otlp_headers_env(monkeypatch: pytest.Monke
     result = configure(endpoint="https://example.test")
 
     assert result == ConfigureResult(tracing_configured=True, metrics_configured=True, logger_configured=True)
-    assert _trace_exporter_headers() == {}
+    assert _trace_exporter_headers() == {
+        ENTITY_HEADER: "deployment-123",
+        API_KEY_HEADER: "secret",
+    }
 
 
 def test_configure_explicit_args_override_env_headers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -313,6 +277,24 @@ def test_configure_explicit_args_override_env_headers(monkeypatch: pytest.Monkey
     assert _trace_exporter_headers() == {
         ENTITY_HEADER: "deployment-abc-123",
         API_KEY_HEADER: "token",
+    }
+
+
+def test_configure_forwards_extra_otlp_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Headers in OTEL_EXPORTER_OTLP_HEADERS that are not DataRobot identity
+    headers must still be forwarded to the signal exporters."""
+    _install_fake_opentelemetry(monkeypatch)
+    monkeypatch.setenv(
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        f"{ENTITY_HEADER}=deployment-123,{API_KEY_HEADER}=secret,x-tenant=acme",
+    )
+
+    configure(endpoint="https://example.test")
+
+    assert _trace_exporter_headers() == {
+        "x-tenant": "acme",
+        ENTITY_HEADER: "deployment-123",
+        API_KEY_HEADER: "secret",
     }
 
 
