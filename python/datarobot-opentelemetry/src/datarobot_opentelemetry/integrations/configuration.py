@@ -15,7 +15,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple, cast
+from typing import cast
 
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
@@ -29,14 +29,14 @@ class ConfigureResult:
     logger_configured: bool
 
 
-def _parse_dr_env_vars() -> Tuple[str | None, str | None]:
+def parse_env_headers() -> tuple[str | None, str | None]:
     env_var_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS") or ""
     env_headers = {}
 
     for item in env_var_headers.split(","):
         if "=" in item:
             key, value = item.split("=", 1)
-            env_headers[key.strip().lower()] = value
+            env_headers[key.strip().lower()] = value.strip()
 
     dr_service_name = env_headers.get(DataRobotOtelHeaders.ENTITY_ID.lower())
     dr_api_key = env_headers.get(DataRobotOtelHeaders.API_KEY.lower())
@@ -45,10 +45,10 @@ def _parse_dr_env_vars() -> Tuple[str | None, str | None]:
 
 
 def configure(
-    endpoint: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[str] = None,
-    api_key: Optional[str] = None,
+    endpoint: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    api_key: str | None = None,
     log_level: int = logging.INFO,
     metrics_export_interval: int = 60000,
 ) -> ConfigureResult:
