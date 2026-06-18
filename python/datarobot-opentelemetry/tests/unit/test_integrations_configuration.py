@@ -44,10 +44,6 @@ def _trace_exporter_headers() -> dict[str, str]:
 
 
 def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Capture the real header parser before we shadow the opentelemetry package
-    # so the configuration code can still parse OTEL_EXPORTER_OTLP_HEADERS.
-    from opentelemetry.util.re import parse_env_headers as real_parse_env_headers
-
     modules: dict[str, types.ModuleType] = {}
 
     def add_module(name: str) -> types.ModuleType:
@@ -141,6 +137,16 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
         def create(attributes: dict[str, str]) -> dict[str, str]:
             return attributes
 
+    def parse_env_headers(s: str, liberal: bool = False) -> dict[str, str]:
+        # This is a very minimal parser that only supports the specific header formats we expect in the tests
+        headers: dict[str, str] = {}
+        for header in s.split(","):
+            if "=" not in header:
+                continue
+            name, value = header.split("=", 1)
+            headers[name.strip().lower()] = value.strip()
+        return headers
+
     opentelemetry = add_module("opentelemetry")
     trace_module = add_module("opentelemetry.trace")
     metrics_module = add_module("opentelemetry.metrics")
@@ -172,6 +178,9 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     instrumentation_logging_module.LoggingHandler = LoggingHandler
     instrumentation_logging_module.LoggingInstrumentor = LoggingInstrumentor
     instrumentation_module.logging = instrumentation_logging_module
+
+    util_re_module = add_module("opentelemetry.util.re")
+    util_re_module.parse_env_headers = parse_env_headers
 
     logs_internal_module = add_module("opentelemetry._logs._internal")
     logs_internal_module.ProxyLoggerProvider = ProxyLoggerProvider
