@@ -68,7 +68,21 @@ The `Makefile` in `python/datarobot-opentelemetry/` provides convenient commands
 
 ## Usage
 
-TODO: Add basic usage examples and common integration patterns.
+This repository contains a Python package under `python/datarobot-opentelemetry`.
+
+For language-specific usage and API examples, see:
+
+- `python/datarobot-opentelemetry/README.md`
+
+Quick start:
+
+```bash
+cd python/datarobot-opentelemetry
+uv sync
+uv run python -c "from datarobot_opentelemetry.semconv import SpanAttributes; print(SpanAttributes.DATAROBOT_TRACE_NAME)"
+```
+
+For full installation and integration examples (including `configure()`), refer to the package README.
 
 ## Testing
 
