@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint and Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python/datarobot-opentelemetry
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Ruff lint
+        run: uv run ruff check src
+
+      - name: Ruff format check
+        run: uv run ruff format --check src
+
+      - name: MyPy
+        run: uv run mypy --pretty --strict src
+
+      - name: Unit tests
+        run: uv run pytest -v tests/unit
+
+  license-headers:
+    name: License Header Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run license-eye header check
+        run: |
+          docker run --rm \
+            -v "${PWD}:/github/workspace" \
+            ghcr.io/apache/skywalking-eyes/license-eye:latest \
+            -v info -c .licenserc.yaml header check
