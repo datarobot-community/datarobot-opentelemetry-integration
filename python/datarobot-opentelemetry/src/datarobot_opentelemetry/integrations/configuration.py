@@ -15,7 +15,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
@@ -30,10 +30,10 @@ class ConfigureResult:
 
 
 def configure(
-    endpoint: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[str] = None,
-    api_key: Optional[str] = None,
+    endpoint: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    api_key: str | None = None,
     log_level: int = logging.INFO,
     metrics_export_interval: int = 60000,
 ) -> ConfigureResult:
@@ -100,37 +100,74 @@ def configure(
             NoOpTracer,
             ProxyTracerProvider,
         )
+        from opentelemetry.util.re import parse_env_headers
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "OpenTelemetry integration dependencies are not installed. "
             "Install with: pip install 'datarobot-opentelemetry[integrations]'"
         ) from exc
 
-    api_key = api_key or os.environ.get("DATAROBOT_API_TOKEN")
-    if not api_key:
-        raise ValueError(
-            "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
-        )
+    def _parse_otel_env_headers() -> dict[str, str]:
+        """Parse OTEL_EXPORTER_OTLP_HEADERS into a dict of header name -> value.
+
+        Uses OpenTelemetry's own ``parse_env_headers`` so we honor exactly the same
+        parsing rules (and ``liberal`` leniency) as the OTLP exporters do, ensuring
+        every header the user configured is preserved. Keys are lower-cased by the
+        parser.
+        """
+        env_var_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS") or ""
+        return dict(parse_env_headers(env_var_headers, liberal=True))
+
+    def _parse_dr_headers(
+        env_headers: dict[str, str],
+    ) -> tuple[str | None, str | None, str | None]:
+        api_key = env_headers.get(DataRobotOtelHeaders.API_KEY.lower())
+
+        entity_type = None
+        entity_id = None
+        if dr_service_name := env_headers.get(
+            DataRobotOtelHeaders.ENTITY_ID.lower(), ""
+        ):
+            # If it contains a hyphen, we assume it's an entity identifier in the format "type-id" and split it.
+            if "-" in dr_service_name:
+                parts = dr_service_name.split("-", 1)
+                entity_type = parts[0]
+                if len(parts) == 2:
+                    entity_id = parts[1]
+
+        return api_key, entity_type, entity_id
+
+    otel_headers = _parse_otel_env_headers()
+    dr_api_key, dr_entity_type, dr_entity_id = _parse_dr_headers(otel_headers)
+
     endpoint = endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not endpoint:
         raise ValueError(
             "Endpoint is required for telemetry export. Provide it as an argument or set the OTEL_EXPORTER_OTLP_ENDPOINT environment variable."
         )
-    entity_type = entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
+
+    api_key = api_key or dr_api_key or os.environ.get("DATAROBOT_API_TOKEN")
+    if not api_key:
+        raise ValueError(
+            "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
+        )
+
+    entity_type = (
+        entity_type or dr_entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
+    )
     if not entity_type:
         raise ValueError(
             "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
         )
-    entity_id = entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
+
+    entity_id = entity_id or dr_entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
     if not entity_id:
         raise ValueError(
             "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
         )
 
-    otel_headers = {
-        DataRobotOtelHeaders.ENTITY_ID: f"{entity_type}-{entity_id}",
-        DataRobotOtelHeaders.API_KEY: api_key,
-    }
+    otel_headers[DataRobotOtelHeaders.ENTITY_ID.lower()] = f"{entity_type}-{entity_id}"
+    otel_headers[DataRobotOtelHeaders.API_KEY.lower()] = api_key
 
     base_endpoint = endpoint.rstrip("/")
 

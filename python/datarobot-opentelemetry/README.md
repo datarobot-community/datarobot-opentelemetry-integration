@@ -71,6 +71,11 @@ export DATAROBOT_ENTITY_TYPE="deployment"
 export DATAROBOT_ENTITY_ID="your-entity-id"
 export DATAROBOT_API_TOKEN="your-api-key"
 ```
+or using OTEL specific environment variables that take precedence:
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://your-telemetry-endpoint.example.com"
+export OTEL_EXPORTER_OTLP_HEADERS="X-DataRobot-Entity-Id=deployment-<your-entity-id>,X-DataRobot-Api-Key=<your-api-key>"
+```
 
 ```python
 from datarobot_opentelemetry.integrations import configure
