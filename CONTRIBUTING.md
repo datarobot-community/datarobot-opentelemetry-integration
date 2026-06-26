@@ -9,8 +9,8 @@ Thanks for your interest in contributing to this project.
 3. Install dependencies with uv.
 
 ```bash
-git clone https://github.com/datarobot/datarobot-opentelemetry.git
-cd datarobot-opentelemetry/python/datarobot-opentelemetry
+git clone https://github.com/datarobot/datarobot-opentelemetry-integration.git
+cd datarobot-opentelemetry-integration/python/datarobot-opentelemetry
 uv sync
 ```
 

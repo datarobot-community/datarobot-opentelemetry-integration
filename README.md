@@ -1,4 +1,4 @@
-# datarobot-opentelemetry
+# datarobot-opentelemetry-integration
 
 
 ## Overview
@@ -18,8 +18,8 @@ This package provides OpenTelemetry semantic conventions and helper utilities us
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/datarobot/datarobot-opentelemetry.git
-   cd datarobot-opentelemetry
+   git clone https://github.com/datarobot/datarobot-opentelemetry-integration.git
+   cd datarobot-opentelemetry-integration
    ```
 
 2. **Install dependencies**:
@@ -166,7 +166,3 @@ make license-check  # Copyright headers
 ```
 
 All checks must pass before your PR will be reviewed.
-
-## Release Process
-
-TODO: Add release/versioning guidance and publishing steps.
