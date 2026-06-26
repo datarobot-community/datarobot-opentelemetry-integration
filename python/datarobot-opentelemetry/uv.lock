@@ -266,7 +266,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'integrations'", specifier = ">=1.43.0" },
-    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'integrations'", specifier = ">=0.63b1" },
+    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'integrations'", specifier = ">=0.64b0" },
     { name = "opentelemetry-sdk", marker = "extra == 'integrations'", specifier = ">=1.36.0" },
 ]
 provides-extras = ["integrations"]
