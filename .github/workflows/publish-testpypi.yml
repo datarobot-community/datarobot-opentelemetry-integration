@@ -24,6 +24,10 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write # <-- MANDATORY: Added for TestPyPI Trusted Publishing
+    defaults:
+      run:
+        working-directory: python/datarobot-opentelemetry
     environment:
       name: Build
       deployment: false
@@ -38,6 +42,22 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
 
+      - name: Block fork PR builds
+        if: github.event_name == 'issue_comment'
+        env:
+          PR_URL: ${{ github.event.issue.pull_request.url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_REPO=$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${PR_URL}" | jq -r '.head.repo.full_name')
+
+          if [ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]; then
+            echo "Refusing to publish for fork PR: ${HEAD_REPO}"
+            exit 1
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -45,40 +65,56 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: python/datarobot-opentelemetry/pyproject.toml
 
-      - name: Stamp dev version for PR builds
+      - name: Stamp dev version for build
         run: |
-          cd python/datarobot-opentelemetry
           BASE_VERSION=$(grep -E '^[[:space:]]*version[[:space:]]*=' -m1 pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
-          DEV_VERSION="${BASE_VERSION}.dev${GITHUB_RUN_NUMBER}"
-          # replace only the first version occurrence
-          sed -i -E "0,/^version\s*=\s*\"[^\"]*\"/s//version = \"${DEV_VERSION}\"/" pyproject.toml
+          export DEV_VERSION="${BASE_VERSION}.dev${GITHUB_RUN_NUMBER}"
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path("pyproject.toml")
+          dev_version = os.environ["DEV_VERSION"]
+          text = path.read_text()
+          updated_text, count = re.subn(
+              r'^version\s*=\s*"[^"]*"',
+              f'version = "{dev_version}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if count != 1:
+              raise SystemExit("Could not find project version line in pyproject.toml")
+          path.write_text(updated_text)
+          PY
+
           echo "Stamped dev version: ${DEV_VERSION}"
 
       - name: Run Tests
         run: |
-          cd python/datarobot-opentelemetry
           uv run pytest -v tests/unit
 
       - name: Run Formatter Check
         run: |
-          cd python/datarobot-opentelemetry
           uv run ruff format --check src
 
       - name: Run Linter Check
         run: |
-          cd python/datarobot-opentelemetry
           uv run ruff check src
 
       - name: Build distribution
         run: |
-          cd python/datarobot-opentelemetry
           uv build
 
       - name: Extract package version
         id: get_version
         run: |
-          cd python/datarobot-opentelemetry
           VERSION=$(grep -E '^[[:space:]]*version[[:space:]]*=' -m1 pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
           echo "PACKAGE_VERSION=${VERSION}" >> $GITHUB_ENV
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -86,12 +122,13 @@ jobs:
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
           packages-dir: python/datarobot-opentelemetry/dist
           skip-existing: true
+          # Note: The 'password' line was removed to automatically fallback to Trusted Publishing (OIDC token exchange)
 
       - name: Comment on PR with TestPyPI link
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

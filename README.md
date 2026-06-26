@@ -166,3 +166,53 @@ make license-check  # Copyright headers
 ```
 
 All checks must pass before your PR will be reviewed.
+
+## Release Process
+
+This repository has two publish workflows:
+
+- `.github/workflows/publish-testpypi.yml` (TestPyPI)
+- `.github/workflows/publish-pypi.yml` (PyPI)
+
+### Publish to TestPyPI (pre-release validation)
+
+Use this when you want to validate packaging and installation before a production release.
+
+1. Ensure your PR branch is pushed and CI is green.
+2. Trigger one of the supported paths:
+- PR comment trigger: add a comment `/build` on the PR.
+- Manual trigger: in GitHub Actions, open `Publish (TestPyPI)` and click `Run workflow`.
+3. Wait for completion in Actions.
+4. If triggered from PR comment, the workflow posts a PR comment with the TestPyPI project URL and install commands.
+
+Notes:
+
+- `/build` runs only for repository members/owners/collaborators.
+- Fork PRs are blocked by the workflow for safety.
+
+### Publish to PyPI (production release)
+
+This workflow is tag-driven only (manual dispatch is disabled).
+
+1. Prepare the release on `main`:
+- Update `python/datarobot-opentelemetry/pyproject.toml` version.
+- Add release notes under `## [<version>]` in `python/datarobot-opentelemetry/CHANGELOG.md`.
+- Merge to `main`.
+2. Create and push the release tag from the release commit:
+
+```bash
+git checkout main
+git pull --ff-only
+VERSION=$(grep -E '^[[:space:]]*version[[:space:]]*=' -m1 python/datarobot-opentelemetry/pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
+git tag "python-v${VERSION}"
+git push origin "python-v${VERSION}"
+```
+
+3. Monitor `Publish (PyPI)` in GitHub Actions until it succeeds.
+
+The PyPI workflow enforces these gates before publish:
+
+- tag name must match `python-v*`
+- tag version must match `pyproject.toml` version
+- `CHANGELOG.md` must contain `## [<version>]`
+- version must not already exist on PyPI
