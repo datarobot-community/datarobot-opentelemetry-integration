@@ -18,7 +18,7 @@ This package provides OpenTelemetry semantic conventions and helper utilities us
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/datarobot/datarobot-opentelemetry-integration.git
+   git clone git@github.com:datarobot-community/datarobot-opentelemetry-integration.git
    cd datarobot-opentelemetry-integration
    ```
 

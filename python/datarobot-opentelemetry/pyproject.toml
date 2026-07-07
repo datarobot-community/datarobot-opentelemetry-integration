@@ -28,8 +28,8 @@ integrations = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/datarobot/datarobot-opentelemetry-integration"
-Repository = "https://github.com/datarobot/datarobot-opentelemetry-integration"
+Homepage = "https://github.com/datarobot-community/datarobot-opentelemetry-integration"
+Repository = "https://github.com/datarobot-community/datarobot-opentelemetry-integration"
 
 [build-system]
 requires = ["hatchling"]
