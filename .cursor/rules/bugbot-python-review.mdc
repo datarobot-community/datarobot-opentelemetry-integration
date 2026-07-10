@@ -1,0 +1,35 @@
+---
+description: Bugbot review checklist for risky Python changes in this repository
+globs:
+  - python/datarobot-opentelemetry/src/**/*.py
+  - python/datarobot-opentelemetry/tests/**/*.py
+alwaysApply: false
+---
+
+# Bugbot Python Review Rule
+
+When reviewing or generating changes in this repository, prioritize finding behavior regressions and safety issues before style concerns.
+
+## Review Priorities
+
+1. Confirm telemetry integration behavior remains backward compatible unless explicitly changed.
+2. Verify environment-variable precedence and configuration fallback logic are preserved.
+3. Ensure semantic convention constants remain stable and typo-free.
+4. Require unit tests for behavior changes, especially around `integrations/configuration.py` and `semconv` modules.
+5. Flag silent exception handling, overly broad `except Exception`, and dropped error context.
+
+## Required Checks Before Approving
+
+1. Run unit tests in package directory:
+   - `uv run pytest -v tests/unit`
+2. Run quality checks:
+   - `make lint`
+3. If headers or new files changed, run:
+   - `make license-check`
+
+## High-Risk Change Signals
+
+- Changes to public constants in `semconv`.
+- Changes to default exporter endpoints, headers, or auth behavior.
+- Changes to package versioning or release workflow files.
+- Added dependencies without justification in `pyproject.toml`.
