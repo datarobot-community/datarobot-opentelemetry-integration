@@ -16,6 +16,10 @@ from dataclasses import dataclass
 
 import pytest
 from opentelemetry import _logs, metrics, trace
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.instrumentation.logging.handler import (
+    LoggingHandler as InstrumentationLoggingHandler,
+)
 from opentelemetry.sdk._logs import LoggingHandler
 
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
@@ -25,6 +29,9 @@ from datarobot_opentelemetry.integrations.fastapi import (
     _SafeLoggingHandler,
 )
 from datarobot_opentelemetry.logging import RedactingFormatter
+
+_ENTITY_HEADER = "x-datarobot-entity-id"
+_API_KEY_HEADER = "x-datarobot-api-key"
 
 _ENV_KEYS_TO_CLEAR = (
     "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -51,7 +58,7 @@ def _reset_otel_singleton() -> None:
 def _uninstrument_all() -> None:
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
-    for instrumentor_cls in (RequestsInstrumentor,):
+    for instrumentor_cls in (RequestsInstrumentor, LoggingInstrumentor):
         instrumentor = instrumentor_cls()
         if instrumentor.is_instrumented_by_opentelemetry:
             instrumentor.uninstrument()
@@ -93,7 +100,9 @@ def reset_otel_singleton(monkeypatch: pytest.MonkeyPatch):
     for handler in [
         h
         for h in root_logger.handlers
-        if isinstance(h, (LoggingHandler, _SafeLoggingHandler))
+        if isinstance(
+            h, (LoggingHandler, InstrumentationLoggingHandler, _SafeLoggingHandler)
+        )
     ]:
         root_logger.removeHandler(handler)
 
@@ -266,6 +275,36 @@ def test_configure_replaces_plain_logging_handler_with_redacting(
             if isinstance(h, (LoggingHandler, _SafeLoggingHandler))
         ]:
             root_logger.removeHandler(handler)
+
+
+def test_configure_end_to_end_leaves_only_the_safe_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: configure_providers() calls LoggingInstrumentor().instrument(),
+    which by default attaches its own opentelemetry.instrumentation.logging.handler.
+    LoggingHandler - a separate class from opentelemetry.sdk._logs.LoggingHandler, not a
+    subclass of it. A previous fix only matched the SDK class, so the instrumentation
+    handler (unredacted, no formatter) was left attached alongside _SafeLoggingHandler:
+    every log record got exported twice, once with no redaction at all. This drives the
+    real configure() -> configure_providers() -> LoggingInstrumentor path end to end,
+    not a hand-constructed handler, so it actually exercises that code."""
+    monkeypatch.setenv(
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        f"{_ENTITY_HEADER}=deployment-abc123,{_API_KEY_HEADER}=secret-token",
+    )
+
+    otel = OTel()
+    otel.configure(FakeOTelConfig(otel_exporter_otlp_endpoint="http://localhost:4318"))
+
+    root_logger = logging.getLogger()
+    export_handlers = [
+        h
+        for h in root_logger.handlers
+        if isinstance(h, (LoggingHandler, InstrumentationLoggingHandler))
+    ]
+    assert export_handlers == [
+        h for h in export_handlers if isinstance(h, _SafeLoggingHandler)
+    ], "a non-redacting log export handler is still attached to the root logger"
 
 
 def test_safe_logging_handler_redacts_exported_attributes() -> None:

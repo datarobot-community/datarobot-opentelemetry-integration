@@ -32,12 +32,16 @@ class ConfigureResult:
 
 def _configure_stdout_fallback_logging(log_level: int) -> None:
     """Attach a basic stdout handler so logs stay visible when OTLP export can't be configured."""
+    from datarobot_opentelemetry.logging import RedactingFormatter
+
     root_logger = logging.getLogger()
     if root_logger.handlers:
         return
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        RedactingFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
     )
     root_logger.addHandler(handler)
     root_logger.setLevel(log_level)

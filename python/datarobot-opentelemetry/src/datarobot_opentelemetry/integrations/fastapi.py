@@ -37,7 +37,10 @@ from opentelemetry import context
 from opentelemetry import metrics
 from opentelemetry import trace
 from opentelemetry._logs import get_logger_provider
-from opentelemetry.sdk._logs import LoggingHandler
+from opentelemetry.instrumentation.logging.handler import (
+    LoggingHandler as _InstrumentationLoggingHandler,
+)
+from opentelemetry.sdk._logs import LoggingHandler as _SDKLoggingHandler
 
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
 from datarobot_opentelemetry.integrations.configuration import (
@@ -88,7 +91,7 @@ class OTelConfig(Protocol):
     otel_sdk_disabled: bool
 
 
-class _SafeLoggingHandler(LoggingHandler):
+class _SafeLoggingHandler(_SDKLoggingHandler):
     """LoggingHandler with ContextVar recursion guard and redacted export attributes.
 
     Backport of opentelemetry-python-contrib #4302, plus: `LoggingHandler._translate()`
@@ -102,7 +105,7 @@ class _SafeLoggingHandler(LoggingHandler):
     def _get_attributes(record: logging.LogRecord) -> dict[str, Any]:
         from datarobot_opentelemetry.logging import redact_attributes
 
-        attributes = LoggingHandler._get_attributes(record)
+        attributes = _SDKLoggingHandler._get_attributes(record)
         return redact_attributes(dict(attributes))
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -172,21 +175,23 @@ class OTLPConnectionErrorFilter(logging.Filter):
 
 
 def _replace_export_handler_with_redacting(log_level: int) -> None:
-    """Swap the plain `LoggingHandler` `configure()` attaches for a redacting one.
+    """Swap the plain log export handler `configure()` attaches for a redacting one.
 
-    `configure()` (via `LoggingInstrumentor().instrument(logger_provider=...)`) attaches a
-    plain `opentelemetry.sdk._logs.LoggingHandler` to the root logger, which would export log
-    records verbatim - including anything sensitive in `extra` fields. Swap it for
-    `_SafeLoggingHandler` wrapped in `RedactingFormatter` so nothing bypasses redaction, while
-    still reusing the LoggerProvider/exporter `configure()` already built.
+    `configure()` calls `LoggingInstrumentor().instrument(logger_provider=..., ...)`, which by
+    default attaches its own `opentelemetry.instrumentation.logging.handler.LoggingHandler` to
+    the root logger - a separate class from `opentelemetry.sdk._logs.LoggingHandler` (not a
+    subclass of it), so a check against only one of them misses the other. Either would export
+    log records verbatim, including anything sensitive in `extra` fields. Swap whichever is
+    attached for `_SafeLoggingHandler` wrapped in `RedactingFormatter` so nothing bypasses
+    redaction, while still reusing the LoggerProvider/exporter `configure()` already built.
     """
     from datarobot_opentelemetry.logging import RedactingFormatter
 
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
-        if isinstance(handler, LoggingHandler) and not isinstance(
-            handler, _SafeLoggingHandler
-        ):
+        if isinstance(
+            handler, (_SDKLoggingHandler, _InstrumentationLoggingHandler)
+        ) and not isinstance(handler, _SafeLoggingHandler):
             root_logger.removeHandler(handler)
 
     safe_handler = _SafeLoggingHandler(

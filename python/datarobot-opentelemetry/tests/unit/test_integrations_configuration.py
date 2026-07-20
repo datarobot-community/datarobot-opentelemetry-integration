@@ -346,6 +346,8 @@ def test_configure_stdout_fallback_logging_attaches_handler_once() -> None:
         _configure_stdout_fallback_logging,
     )
 
+    from datarobot_opentelemetry.logging import RedactingFormatter
+
     root_logger = logging.getLogger()
     saved_handlers = root_logger.handlers[:]
     root_logger.handlers.clear()
@@ -354,6 +356,10 @@ def test_configure_stdout_fallback_logging_attaches_handler_once() -> None:
         assert len(root_logger.handlers) == 1
         assert isinstance(root_logger.handlers[0], logging.StreamHandler)
         assert root_logger.handlers[0].stream is sys.stdout
+        # Every other logging path this package offers (init_logging, get_logger,
+        # uvicorn) wraps its formatter in RedactingFormatter - the fallback path
+        # must not be the one place that logs secrets in cleartext.
+        assert isinstance(root_logger.handlers[0].formatter, RedactingFormatter)
 
         # A second call must not stack a duplicate handler.
         _configure_stdout_fallback_logging(logging.INFO)
