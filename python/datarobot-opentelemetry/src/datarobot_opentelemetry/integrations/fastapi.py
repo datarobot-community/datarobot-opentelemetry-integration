@@ -248,13 +248,6 @@ class OTel:
             assert self._result is not None
             return self._result
 
-        if config.otel_exporter_otlp_endpoint:
-            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
-                config.otel_exporter_otlp_endpoint
-            )
-        if config.otel_exporter_otlp_headers:
-            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = config.otel_exporter_otlp_headers
-
         if config.otel_sdk_disabled:
             logger.info(
                 "OTel SDK disabled via config; skipping telemetry configuration."
@@ -266,6 +259,13 @@ class OTel:
             )
             self._configured = True
             return self._result
+
+        if config.otel_exporter_otlp_endpoint:
+            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+                config.otel_exporter_otlp_endpoint
+            )
+        if config.otel_exporter_otlp_headers:
+            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = config.otel_exporter_otlp_headers
 
         result = configure_providers(
             entity_type=self.entity_type, entity_id=self.entity_id

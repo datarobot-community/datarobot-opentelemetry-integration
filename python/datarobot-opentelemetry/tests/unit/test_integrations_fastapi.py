@@ -127,13 +127,25 @@ def test_configure_disabled_via_sdk_disabled_skips_delegation(
     )
 
     otel = OTel()
-    result = otel.configure(FakeOTelConfig(otel_sdk_disabled=True))
+    result = otel.configure(
+        FakeOTelConfig(
+            otel_exporter_otlp_endpoint="https://otel.datarobot.com",
+            otel_exporter_otlp_headers="x-datarobot-api-key=super-secret",
+            otel_sdk_disabled=True,
+        )
+    )
 
     assert called is False
     assert result == ConfigureResult(
         tracing_configured=False, metrics_configured=False, logger_configured=False
     )
     assert otel.telemetry_enabled is False
+    # Regression test: the endpoint/headers used to be mirrored into os.environ
+    # before the otel_sdk_disabled check, so a disabled config would still leak
+    # them (headers can carry an API key) into the process environment where
+    # other OTel-aware libraries could pick them up.
+    assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in os.environ
+    assert "OTEL_EXPORTER_OTLP_HEADERS" not in os.environ
 
 
 def test_configure_delegates_to_configure_providers(
