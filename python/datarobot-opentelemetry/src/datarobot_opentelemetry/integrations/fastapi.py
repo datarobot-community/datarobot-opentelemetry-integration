@@ -151,7 +151,8 @@ class OTLPConnectionErrorFilter(logging.Filter):
         ):
             if record.exc_info:
                 exc = record.exc_info[1]
-                while exc is not None:
+                seen: set[int] = set()
+                while exc is not None and id(exc) not in seen:
                     if type(exc).__name__ in (
                         "ConnectionError",
                         "NewConnectionError",
@@ -159,6 +160,7 @@ class OTLPConnectionErrorFilter(logging.Filter):
                     ):
                         should_suppress = True
                         break
+                    seen.add(id(exc))
                     exc = exc.__cause__ or exc.__context__
 
         if should_suppress:
