@@ -57,7 +57,11 @@ class JsonFormatter(logging.Formatter):
             str, Union[Callable[[logging.LogRecord], Any], Any]
         ] = {
             "timestamp": lambda _: datetime.now(timezone.utc).isoformat(),
-            "level": lambda record: record.levelname,
+            # The Chronosphere OTel collector's node daemonset only extracts severity
+            # from JSON logs when this key is exactly "levelname" (severity_parser
+            # matches on attributes.levelname) - it never looked for "level" and
+            # silently defaulted every JSON log line from this formatter to INFO.
+            "levelname": lambda record: record.levelname,
             "logger": lambda record: record.name,
         }
 

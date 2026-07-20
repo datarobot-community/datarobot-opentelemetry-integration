@@ -49,7 +49,18 @@ def test_json_formatter_includes_extra_fields() -> None:
     data = json.loads(JsonFormatter().format(record))
     assert data["message"] == "hello"
     assert data["user_id"] == "u1"
-    assert data["level"] == "INFO"
+    assert data["levelname"] == "INFO"
+
+
+def test_json_formatter_severity_key_matches_collector_severity_parser() -> None:
+    # Regression test: the Chronosphere OTel collector's severity_parser for JSON
+    # logs only fires on `attributes.levelname`. A "level" key (the original,
+    # upstream-inherited name) silently drops severity for every JSON log line
+    # from this formatter, defaulting it to INFO downstream.
+    record = _make_record("hello")
+    data = json.loads(JsonFormatter().format(record))
+    assert data["levelname"] == "INFO"
+    assert "level" not in data
 
 
 def test_json_formatter_serializes_arbitrary_object_via_str_fallback() -> None:
