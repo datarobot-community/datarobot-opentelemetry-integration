@@ -1,6 +1,6 @@
 [project]
 name = "datarobot-opentelemetry"
-version = "0.2.1"
+version = "0.3.0"
 description = "OpenTelemetry utilities and encapsulation of semantic naming conventions for improved integration with DataRobot."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -26,6 +26,13 @@ integrations = [
     "opentelemetry-instrumentation-logging>=0.64b0",
     "opentelemetry-sdk>=1.36.0",
 ]
+fastapi = [
+    "datarobot-opentelemetry[integrations]",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-instrumentation-httpx>=0.43b0",
+    "opentelemetry-instrumentation-requests>=0.43b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.43b0",
+]
 
 [project.urls]
 Homepage = "https://github.com/datarobot-community/datarobot-opentelemetry-integration"
@@ -37,8 +44,13 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "datarobot-opentelemetry[integrations,fastapi]",
     "mypy>=1.19.1",
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.0.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.20",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

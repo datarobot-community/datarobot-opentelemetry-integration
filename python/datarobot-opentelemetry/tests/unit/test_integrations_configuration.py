@@ -93,7 +93,9 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
             self.resource = resource
 
     class LoggingHandler(logging.Handler):
-        def __init__(self, level: int = logging.NOTSET, logger_provider: object | None = None) -> None:
+        def __init__(
+            self, level: int = logging.NOTSET, logger_provider: object | None = None
+        ) -> None:
             super().__init__(level)
             self.logger_provider = logger_provider
 
@@ -113,17 +115,23 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
             self.exporter = exporter
 
     class OTLPSpanExporter:
-        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
+        def __init__(
+            self, endpoint: str | None = None, headers: dict[str, str] | None = None
+        ) -> None:
             self.endpoint = endpoint
             self.headers = headers
 
     class OTLPLogExporter:
-        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
+        def __init__(
+            self, endpoint: str | None = None, headers: dict[str, str] | None = None
+        ) -> None:
             self.endpoint = endpoint
             self.headers = headers
 
     class OTLPMetricExporter:
-        def __init__(self, endpoint: str | None = None, headers: dict[str, str] | None = None) -> None:
+        def __init__(
+            self, endpoint: str | None = None, headers: dict[str, str] | None = None
+        ) -> None:
             self.endpoint = endpoint
             self.headers = headers
 
@@ -156,15 +164,21 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     trace_module.ProxyTracerProvider = ProxyTracerProvider
     trace_module._provider = ProxyTracerProvider()
     trace_module.get_tracer_provider = lambda: trace_module._provider
-    trace_module.set_tracer_provider = lambda provider: setattr(trace_module, "_provider", provider)
+    trace_module.set_tracer_provider = lambda provider: setattr(
+        trace_module, "_provider", provider
+    )
 
     logs_module._provider = ProxyLoggerProvider()
     logs_module.get_logger_provider = lambda: logs_module._provider
-    logs_module.set_logger_provider = lambda provider: setattr(logs_module, "_provider", provider)
+    logs_module.set_logger_provider = lambda provider: setattr(
+        logs_module, "_provider", provider
+    )
 
     metrics_module._provider = _ProxyMeterProvider()
     metrics_module.get_meter_provider = lambda: metrics_module._provider
-    metrics_module.set_meter_provider = lambda provider: setattr(metrics_module, "_provider", provider)
+    metrics_module.set_meter_provider = lambda provider: setattr(
+        metrics_module, "_provider", provider
+    )
 
     opentelemetry.trace = trace_module
     opentelemetry.metrics = metrics_module
@@ -204,25 +218,35 @@ def _install_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     sdk_metrics_module.MeterProvider = MeterProvider
 
     sdk_metrics_export_module = add_module("opentelemetry.sdk.metrics.export")
-    sdk_metrics_export_module.PeriodicExportingMetricReader = PeriodicExportingMetricReader
+    sdk_metrics_export_module.PeriodicExportingMetricReader = (
+        PeriodicExportingMetricReader
+    )
 
     metrics_internal_module = add_module("opentelemetry.metrics._internal")
     metrics_internal_module._ProxyMeterProvider = _ProxyMeterProvider
 
-    trace_exporter_module = add_module("opentelemetry.exporter.otlp.proto.http.trace_exporter")
+    trace_exporter_module = add_module(
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+    )
     trace_exporter_module.OTLPSpanExporter = OTLPSpanExporter
 
-    log_exporter_module = add_module("opentelemetry.exporter.otlp.proto.http._log_exporter")
+    log_exporter_module = add_module(
+        "opentelemetry.exporter.otlp.proto.http._log_exporter"
+    )
     log_exporter_module.OTLPLogExporter = OTLPLogExporter
 
-    metric_exporter_module = add_module("opentelemetry.exporter.otlp.proto.http.metric_exporter")
+    metric_exporter_module = add_module(
+        "opentelemetry.exporter.otlp.proto.http.metric_exporter"
+    )
     metric_exporter_module.OTLPMetricExporter = OTLPMetricExporter
 
     for name, module in modules.items():
         monkeypatch.setitem(__import__("sys").modules, name, module)
 
 
-def test_configure_raises_actionable_error_when_opentelemetry_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_raises_actionable_error_when_opentelemetry_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     real_import = builtins.__import__
 
     def _patched_import(name: str, *args: object, **kwargs: object) -> object:
@@ -238,16 +262,22 @@ def test_configure_raises_actionable_error_when_opentelemetry_missing(monkeypatc
     assert "datarobot-opentelemetry[integrations]" in str(error.value)
 
 
-def test_configure_succeeds_with_fake_opentelemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_succeeds_with_fake_opentelemetry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _install_fake_opentelemetry(monkeypatch)
 
     from datarobot_opentelemetry.integrations import ConfigureResult
 
     result = configure("https://example.test", "deployment", "abc-123", api_key="token")
-    assert result == ConfigureResult(tracing_configured=True, metrics_configured=True, logger_configured=True)
+    assert result == ConfigureResult(
+        tracing_configured=True, metrics_configured=True, logger_configured=True
+    )
 
 
-def test_configure_uses_identity_from_otlp_headers_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_uses_identity_from_otlp_headers_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """When OTLP headers already carry the entity id and api key, configure
     should not require the DATAROBOT_* args/env vars and should forward those
     values to the per-signal exporter headers."""
@@ -261,14 +291,18 @@ def test_configure_uses_identity_from_otlp_headers_env(monkeypatch: pytest.Monke
 
     result = configure(endpoint="https://example.test")
 
-    assert result == ConfigureResult(tracing_configured=True, metrics_configured=True, logger_configured=True)
+    assert result == ConfigureResult(
+        tracing_configured=True, metrics_configured=True, logger_configured=True
+    )
     assert _trace_exporter_headers() == {
         ENTITY_HEADER: "deployment-123",
         API_KEY_HEADER: "secret",
     }
 
 
-def test_configure_explicit_args_override_env_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_explicit_args_override_env_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Explicit api_key/entity args are honored even when OTLP headers env is set."""
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.setenv(
@@ -307,28 +341,77 @@ def test_configure_forwards_extra_otlp_headers(monkeypatch: pytest.MonkeyPatch) 
     }
 
 
-def test_configure_requires_api_key_when_not_in_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_stdout_fallback_logging_attaches_handler_once() -> None:
+    from datarobot_opentelemetry.integrations.configuration import (
+        _configure_stdout_fallback_logging,
+    )
+
+    root_logger = logging.getLogger()
+    saved_handlers = root_logger.handlers[:]
+    root_logger.handlers.clear()
+    try:
+        _configure_stdout_fallback_logging(logging.INFO)
+        assert len(root_logger.handlers) == 1
+        assert isinstance(root_logger.handlers[0], logging.StreamHandler)
+        assert root_logger.handlers[0].stream is sys.stdout
+
+        # A second call must not stack a duplicate handler.
+        _configure_stdout_fallback_logging(logging.INFO)
+        assert len(root_logger.handlers) == 1
+    finally:
+        root_logger.handlers.clear()
+        root_logger.handlers.extend(saved_handlers)
+
+
+def test_configure_falls_back_to_stdout_when_api_key_missing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", f"{ENTITY_HEADER}=deployment-123")
 
-    with pytest.raises(ValueError, match="API key is required"):
-        configure(endpoint="https://example.test")
+    from datarobot_opentelemetry.integrations import ConfigureResult
+
+    with caplog.at_level(logging.WARNING):
+        result = configure(endpoint="https://example.test")
+
+    assert result == ConfigureResult(
+        tracing_configured=False, metrics_configured=False, logger_configured=False
+    )
+    assert "api_key" in caplog.text
 
 
-def test_configure_requires_entity_when_not_in_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_falls_back_to_stdout_when_entity_missing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", f"{API_KEY_HEADER}=secret")
 
-    with pytest.raises(ValueError, match="Entity type is required"):
-        configure(endpoint="https://example.test")
+    from datarobot_opentelemetry.integrations import ConfigureResult
+
+    with caplog.at_level(logging.WARNING):
+        result = configure(endpoint="https://example.test")
+
+    assert result == ConfigureResult(
+        tracing_configured=False, metrics_configured=False, logger_configured=False
+    )
+    assert "entity_type" in caplog.text
 
 
-def test_configure_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_falls_back_to_stdout_when_endpoint_missing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.setenv(
         "OTEL_EXPORTER_OTLP_HEADERS",
         f"{ENTITY_HEADER}=deployment-123,{API_KEY_HEADER}=secret",
     )
 
-    with pytest.raises(ValueError, match="Endpoint is required"):
-        configure()
+    from datarobot_opentelemetry.integrations import ConfigureResult
+
+    with caplog.at_level(logging.WARNING):
+        result = configure()
+
+    assert result == ConfigureResult(
+        tracing_configured=False, metrics_configured=False, logger_configured=False
+    )
+    assert "endpoint" in caplog.text

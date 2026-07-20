@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-07-20
+
+### Added
+
+- `fastapi` extra with a new `datarobot_opentelemetry.integrations.fastapi` module: an
+  `OTel` manager for FastAPI Custom Applications that layers FastAPI/httpx/requests/
+  SQLAlchemy auto-instrumentation and redacted log export on top of `configure()`,
+  instead of re-implementing provider setup.
+- `datarobot_opentelemetry.logging` module with structured (`json`/`text`/`readable`)
+  log formatters, `RedactingFormatter` for stripping sensitive values from log output,
+  and a `log_api_call` decorator.
+- `datarobot_opentelemetry.integrations.uvicorn.configure_uvicorn_logging` to route
+  uvicorn's access/error loggers through the same formatters and redaction.
+
+### Changed
+
+- `configure()` no longer raises `ValueError` when the endpoint, API key, entity type,
+  or entity id are missing. It now logs a warning, falls back to a basic stdout logging
+  handler, and returns `ConfigureResult` with every signal `False`, so an app without
+  telemetry configured (e.g. local development) still starts and logs normally.
+
 ## [0.2.1] - 2026-06-017
 
 ### Added

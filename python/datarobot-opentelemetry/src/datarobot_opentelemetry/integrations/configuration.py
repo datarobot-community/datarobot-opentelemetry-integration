@@ -14,6 +14,7 @@
 
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from typing import cast
 
@@ -27,6 +28,19 @@ class ConfigureResult:
     tracing_configured: bool
     metrics_configured: bool
     logger_configured: bool
+
+
+def _configure_stdout_fallback_logging(log_level: int) -> None:
+    """Attach a basic stdout handler so logs stay visible when OTLP export can't be configured."""
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level)
 
 
 def configure(
@@ -141,30 +155,40 @@ def configure(
     dr_api_key, dr_entity_type, dr_entity_id = _parse_dr_headers(otel_headers)
 
     endpoint = endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        raise ValueError(
-            "Endpoint is required for telemetry export. Provide it as an argument or set the OTEL_EXPORTER_OTLP_ENDPOINT environment variable."
-        )
-
     api_key = api_key or dr_api_key or os.environ.get("DATAROBOT_API_TOKEN")
-    if not api_key:
-        raise ValueError(
-            "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
-        )
-
     entity_type = (
         entity_type or dr_entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
     )
-    if not entity_type:
-        raise ValueError(
-            "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
+    entity_id = entity_id or dr_entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
+
+    missing = [
+        name
+        for name, value in (
+            ("endpoint", endpoint),
+            ("api_key", api_key),
+            ("entity_type", entity_type),
+            ("entity_id", entity_id),
+        )
+        if not value
+    ]
+    if missing:
+        logger.warning(
+            "Skipping OTel export configuration, missing: %s. "
+            "Provide them as arguments or via OTEL_EXPORTER_OTLP_ENDPOINT / "
+            "DATAROBOT_API_TOKEN / DATAROBOT_ENTITY_TYPE / DATAROBOT_ENTITY_ID. "
+            "Falling back to stdout logging.",
+            ", ".join(missing),
+        )
+        _configure_stdout_fallback_logging(log_level)
+        return ConfigureResult(
+            tracing_configured=False,
+            metrics_configured=False,
+            logger_configured=False,
         )
 
-    entity_id = entity_id or dr_entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
-    if not entity_id:
-        raise ValueError(
-            "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
-        )
+    assert (
+        endpoint and api_key and entity_type and entity_id
+    )  # narrowed by the check above
 
     otel_headers[DataRobotOtelHeaders.ENTITY_ID.lower()] = f"{entity_type}-{entity_id}"
     otel_headers[DataRobotOtelHeaders.API_KEY.lower()] = api_key
