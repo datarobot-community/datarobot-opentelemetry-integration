@@ -99,7 +99,7 @@ class _SafeLoggingHandler(LoggingHandler):
     """
 
     @staticmethod
-    def _get_attributes(record: logging.LogRecord) -> dict:
+    def _get_attributes(record: logging.LogRecord) -> dict[str, Any]:
         from datarobot_opentelemetry.logging import redact_attributes
 
         attributes = LoggingHandler._get_attributes(record)
