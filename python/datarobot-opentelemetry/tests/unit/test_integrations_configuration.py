@@ -262,13 +262,14 @@ def test_configure_raises_actionable_error_when_opentelemetry_missing(
     assert "datarobot-opentelemetry[integrations]" in str(error.value)
 
 
-def test_configure_uses_create_dr_resource_for_dr_standard_attributes(
+def test_configure_builds_dr_standard_resource_attributes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """configure() must build its Resource via datarobot.core.otel.create_dr_resource()
-    rather than a minimal inline dict, so tracing/metrics/logging all get the same
-    DR-standard attributes (service.name, application.id, k8s.pod.name, service.version)
-    instead of just datarobot.service.priority."""
+    """configure() must build a Resource with the same DR-standard attributes as
+    datarobot.core.otel.create_dr_resource() in public_api_client (service.name,
+    application.id, k8s.pod.name, service.version) - the logic is duplicated rather
+    than imported (see _build_dr_resource's docstring), so this guards against the
+    two implementations drifting apart."""
     _install_fake_opentelemetry(monkeypatch)
     monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
 

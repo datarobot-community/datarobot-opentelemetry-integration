@@ -105,6 +105,9 @@ def configure(
         from opentelemetry.sdk.metrics.export import (
             PeriodicExportingMetricReader,
         )
+        from opentelemetry.sdk.resources import (
+            Resource,
+        )
         from opentelemetry.sdk.trace import (
             TracerProvider,
         )
@@ -116,8 +119,6 @@ def configure(
             ProxyTracerProvider,
         )
         from opentelemetry.util.re import parse_env_headers
-
-        from datarobot.core.otel import create_dr_resource
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "OpenTelemetry integration dependencies are not installed. "
@@ -204,11 +205,34 @@ def configure(
             return base_endpoint
         return f"{base_endpoint}{suffix}"
 
+    def _build_dr_resource() -> Resource:
+        """Build an OTel Resource with DataRobot-standard attributes.
+
+        Deliberately duplicates (not imports) datarobot.core.otel.create_dr_resource()
+        in public_api_client: that function's own logic is tiny and stable, but the
+        `datarobot` package it lives in unconditionally pulls in pandas/numpy as base
+        dependencies - too much weight to add to this package just to reuse ~15 lines
+        of attribute-building with no real logic of its own. Keep this in sync with
+        create_dr_resource() if that ever changes.
+        """
+        attrs: dict[str, str] = {"datarobot.service.priority": "p1"}
+        if not os.environ.get("OTEL_SERVICE_NAME"):
+            attrs["service.name"] = f"{entity_type}-{entity_id}"
+        attrs["datarobot.application.id"] = entity_id
+        if os.environ.get("KUBERNETES_SERVICE_HOST"):
+            pod_name = os.environ.get("HOSTNAME")
+            if pod_name:
+                attrs["k8s.pod.name"] = pod_name
+        version = os.environ.get("APP_VERSION") or os.environ.get("SERVICE_VERSION")
+        if version:
+            attrs["service.version"] = version
+        return Resource.create(attrs)
+
     tracing_configured = False
     metrics_configured = False
     logger_configured = False
 
-    base_resource = create_dr_resource(entity_type, entity_id)
+    base_resource = _build_dr_resource()
 
     # Configure tracing
     try:
