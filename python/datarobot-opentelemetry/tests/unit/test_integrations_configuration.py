@@ -262,6 +262,26 @@ def test_configure_raises_actionable_error_when_opentelemetry_missing(
     assert "datarobot-opentelemetry[integrations]" in str(error.value)
 
 
+def test_configure_uses_create_dr_resource_for_dr_standard_attributes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """configure() must build its Resource via datarobot.core.otel.create_dr_resource()
+    rather than a minimal inline dict, so tracing/metrics/logging all get the same
+    DR-standard attributes (service.name, application.id, k8s.pod.name, service.version)
+    instead of just datarobot.service.priority."""
+    _install_fake_opentelemetry(monkeypatch)
+    monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
+
+    from opentelemetry import trace
+
+    configure("https://example.test", "deployment", "abc-123", api_key="token")
+
+    resource = trace.get_tracer_provider().resource
+    assert resource["datarobot.service.priority"] == "p1"
+    assert resource["service.name"] == "deployment-abc-123"
+    assert resource["datarobot.application.id"] == "abc-123"
+
+
 def test_configure_succeeds_with_fake_opentelemetry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

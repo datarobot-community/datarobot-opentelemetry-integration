@@ -105,9 +105,6 @@ def configure(
         from opentelemetry.sdk.metrics.export import (
             PeriodicExportingMetricReader,
         )
-        from opentelemetry.sdk.resources import (
-            Resource,
-        )
         from opentelemetry.sdk.trace import (
             TracerProvider,
         )
@@ -119,6 +116,8 @@ def configure(
             ProxyTracerProvider,
         )
         from opentelemetry.util.re import parse_env_headers
+
+        from datarobot.core.otel import create_dr_resource
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "OpenTelemetry integration dependencies are not installed. "
@@ -209,11 +208,7 @@ def configure(
     metrics_configured = False
     logger_configured = False
 
-    base_resource = Resource.create(
-        {
-            "datarobot.service.priority": "p1",
-        }
-    )
+    base_resource = create_dr_resource(entity_type, entity_id)
 
     # Configure tracing
     try:
