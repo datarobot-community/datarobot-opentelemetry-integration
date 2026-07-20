@@ -136,6 +136,22 @@ class TextFormatter(logging.Formatter):
     appended to the message in key=value format, separated by ' | '.
     """
 
+    def formatException(self, ei: Any) -> str:
+        """Indent every line of the traceback, including the first and last.
+
+        The DataRobot OTel collector's recombine operator treats any line that
+        doesn't start with whitespace as the start of a new log record
+        (`is_first_entry: 'body matches "^[^\\s]"'`). The default unindented
+        traceback - "Traceback (most recent call last):" and the final
+        "ValueError: ..." line both start at column 0 - gets split into
+        separate, severity-less records. Indent every line so the whole
+        traceback stays attached to the record it belongs to.
+        """
+        tb_str = super().formatException(ei)
+        return "\n".join(
+            _READABLE_INDENT + line for line in tb_str.rstrip().split("\n")
+        )
+
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as text, including extra fields."""
         message = super().format(record)

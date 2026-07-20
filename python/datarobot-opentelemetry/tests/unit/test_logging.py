@@ -87,6 +87,28 @@ def test_text_formatter_appends_extra_fields() -> None:
     assert formatter.format(record) == "hello | user_id=u1"
 
 
+def test_text_formatter_indents_every_traceback_line() -> None:
+    # Regression test: the DataRobot OTel collector's recombine operator treats any
+    # line that doesn't start with whitespace as the start of a new log record. The
+    # default (unindented) traceback has two such lines - "Traceback (most recent
+    # call last):" and the final "ValueError: ..." line - which would each get split
+    # off into their own severity-less record. Every line after the first must be
+    # indented.
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        record = _make_record("failed")
+        record.exc_info = sys.exc_info()
+
+    formatted = TextFormatter("%(message)s").format(record)
+    lines = formatted.split("\n")
+    assert lines[0] == "failed"
+    assert len(lines) > 1
+    for line in lines[1:]:
+        assert line[:1] in (" ", "\t"), f"unindented continuation line: {line!r}"
+    assert "ValueError: boom" in formatted
+
+
 def test_readable_formatter_single_line_without_exception() -> None:
     record = _make_record("hello")
     output = ReadableFormatter().format(record)
