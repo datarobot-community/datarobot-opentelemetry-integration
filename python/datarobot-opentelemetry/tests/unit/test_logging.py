@@ -25,6 +25,7 @@ from datarobot_opentelemetry.logging import (
     get_logger,
     init_logging,
     log_api_call,
+    redact_attributes,
 )
 
 
@@ -118,6 +119,20 @@ def test_redacting_formatter_does_not_mutate_original_record() -> None:
     record = _make_record("hello", api_key="super-secret")
     RedactingFormatter(TextFormatter("%(message)s")).format(record)
     assert record.api_key == "super-secret"
+
+
+def test_redact_attributes_redacts_top_level_sensitive_key() -> None:
+    assert redact_attributes({"api_key": "super-secret", "ok": "value"}) == {
+        "api_key": "[REDACTED]",
+        "ok": "value",
+    }
+
+
+def test_redact_attributes_redacts_nested_dict_value() -> None:
+    redacted = redact_attributes(
+        {"payload": {"api_key": "super-secret", "ok": "value"}}
+    )
+    assert redacted == {"payload": {"api_key": "[REDACTED]", "ok": "value"}}
 
 
 def test_init_logging_wires_redacting_formatter_by_default() -> None:

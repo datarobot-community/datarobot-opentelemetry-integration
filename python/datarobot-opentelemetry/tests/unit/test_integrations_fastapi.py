@@ -72,7 +72,9 @@ def _uninstrument_all() -> None:
 @pytest.fixture(autouse=True)
 def reset_otel_singleton(monkeypatch: pytest.MonkeyPatch):
     """Undo the process-wide side effects OTel.configure() leaves behind: the singleton,
-    env vars it mirrors from config, and global library auto-instrumentation. The global
+    env vars it mirrors from config, global library auto-instrumentation, and any
+    (Safe)LoggingHandler it attached to the root logger - shutdown() stops the
+    provider's export but does not remove the handler itself. The global
     Trace/Log/Meter providers set via trace.set_tracer_provider() etc. have no public
     "unset" API and are not reset here - a test that actually configures one leaves it
     installed for the rest of the session.
@@ -87,6 +89,13 @@ def reset_otel_singleton(monkeypatch: pytest.MonkeyPatch):
     for key in _ENV_KEYS_TO_CLEAR:
         monkeypatch.delenv(key, raising=False)
     _uninstrument_all()
+    root_logger = logging.getLogger()
+    for handler in [
+        h
+        for h in root_logger.handlers
+        if isinstance(h, (LoggingHandler, _SafeLoggingHandler))
+    ]:
+        root_logger.removeHandler(handler)
 
 
 def test_otel_config_protocol_is_satisfied_structurally() -> None:
@@ -160,6 +169,38 @@ def test_configure_delegates_to_configure_providers(
     assert os.environ["OTEL_EXPORTER_OTLP_HEADERS"] == "x-datarobot-api-key=abc"
 
 
+def test_configure_second_call_is_a_no_op(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression test: configure() used to have no guard against being called
+    twice, so a second call re-ran configure_providers() and stacked a second
+    _SafeLoggingHandler on the root logger, exporting every log record twice."""
+    call_count = 0
+
+    def _fake_configure_providers(**_: object) -> ConfigureResult:
+        nonlocal call_count
+        call_count += 1
+        return ConfigureResult(
+            tracing_configured=True, metrics_configured=True, logger_configured=True
+        )
+
+    monkeypatch.setattr(
+        "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+        _fake_configure_providers,
+    )
+
+    otel = OTel()
+    config = FakeOTelConfig(otel_exporter_otlp_endpoint="http://localhost:4318")
+    first_result = otel.configure(config)
+    second_result = otel.configure(config)
+
+    assert call_count == 1
+    assert second_result is first_result
+    root_logger = logging.getLogger()
+    safe_handlers = [
+        h for h in root_logger.handlers if isinstance(h, _SafeLoggingHandler)
+    ]
+    assert len(safe_handlers) == 1
+
+
 def test_configure_telemetry_disabled_when_nothing_gets_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -213,6 +254,27 @@ def test_configure_replaces_plain_logging_handler_with_redacting(
             if isinstance(h, (LoggingHandler, _SafeLoggingHandler))
         ]:
             root_logger.removeHandler(handler)
+
+
+def test_safe_logging_handler_redacts_exported_attributes() -> None:
+    """Regression test: LoggingHandler._translate() reads attributes via
+    _get_attributes(record), independent of self.format(record) - so wrapping the
+    formatter in RedactingFormatter alone redacted the exported body string but left
+    sensitive extra fields exposed in the attributes dict sent to the OTel backend."""
+    record = logging.LogRecord(
+        name="test.logger",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="calling api",
+        args=(),
+        exc_info=None,
+    )
+    record.api_key = "super-secret"
+
+    attributes = _SafeLoggingHandler._get_attributes(record)
+
+    assert attributes["api_key"] == "[REDACTED]"
 
 
 def test_shutdown_without_configuring_is_a_no_op() -> None:

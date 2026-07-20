@@ -148,10 +148,53 @@ class TextFormatter(logging.Formatter):
         return message
 
 
+SENSITIVE_LOG_KEYS: List[str] = ["access_token", "refresh_token", "api_key"]
+
+
+def redact_value(obj: Any, sensitive_keys: List[str] = SENSITIVE_LOG_KEYS) -> Any:
+    """
+    Recursively redact sensitive information from dictionaries and objects.
+    Returns a new object with redacted values without mutating the original.
+    """
+    if isinstance(obj, dict):
+        return {
+            k: "[REDACTED]" if k in sensitive_keys else redact_value(v, sensitive_keys)
+            for k, v in obj.items()
+        }
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(redact_value(item, sensitive_keys) for item in obj)
+    elif hasattr(obj, "__dict__"):
+        # create a shallow copy first to avoid mutating the original
+        try:
+            obj_copy = copy.copy(obj)
+            for key in sensitive_keys:
+                if hasattr(obj_copy, key):
+                    setattr(obj_copy, key, "[REDACTED]")
+            return obj_copy
+        except (TypeError, AttributeError):
+            return obj
+    return obj
+
+
+def redact_attributes(
+    attributes: Dict[str, Any], sensitive_keys: List[str] = SENSITIVE_LOG_KEYS
+) -> Dict[str, Any]:
+    """Redact a flat mapping (e.g. OTel log record attributes), including top-level keys.
+
+    Unlike `redact_value`, which only redacts keys nested *inside* a dict/object value,
+    this also treats the mapping's own top-level keys as redactable - so
+    `{"api_key": "secret"}` redacts to `{"api_key": "[REDACTED]"}`.
+    """
+    return {
+        k: "[REDACTED]" if k in sensitive_keys else redact_value(v, sensitive_keys)
+        for k, v in attributes.items()
+    }
+
+
 class RedactingFormatter(logging.Formatter):
     """Wraps another formatter to redact sensitive values from log output."""
 
-    sensitive_keys: List[str] = ["access_token", "refresh_token", "api_key"]
+    sensitive_keys: List[str] = SENSITIVE_LOG_KEYS
 
     def __init__(self, original_formatter: logging.Formatter):
         super().__init__()
@@ -164,30 +207,6 @@ class RedactingFormatter(logging.Formatter):
             )
             self.patterns.append((key, pattern))
 
-    def _redact_dict(self, obj: Any) -> Any:
-        """
-        Recursively redact sensitive information from dictionaries and objects.
-        Returns a new object with redacted values without mutating the original.
-        """
-        if isinstance(obj, dict):
-            return {
-                k: "[REDACTED]" if k in self.sensitive_keys else self._redact_dict(v)
-                for k, v in obj.items()
-            }
-        elif isinstance(obj, (list, tuple)):
-            return type(obj)(self._redact_dict(item) for item in obj)
-        elif hasattr(obj, "__dict__"):
-            # create a shallow copy first to avoid mutating the original
-            try:
-                obj_copy = copy.copy(obj)
-                for key in self.sensitive_keys:
-                    if hasattr(obj_copy, key):
-                        setattr(obj_copy, key, "[REDACTED]")
-                return obj_copy
-            except (TypeError, AttributeError):
-                return obj
-        return obj
-
     def format(self, record: logging.LogRecord) -> str:
         """Format the record, redacting sensitive keys from attributes and their string reprs."""
         record = copy.copy(record)
@@ -198,7 +217,7 @@ class RedactingFormatter(logging.Formatter):
 
         for key, value in list(record.__dict__.items()):
             if key not in _ALL_EXCLUDED_LOG_RECORD_ATTRS:
-                record.__dict__[key] = self._redact_dict(value)
+                record.__dict__[key] = redact_value(value, self.sensitive_keys)
 
         formatted = self.original_formatter.format(record)
 

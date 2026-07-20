@@ -89,10 +89,21 @@ class OTelConfig(Protocol):
 
 
 class _SafeLoggingHandler(LoggingHandler):
-    """LoggingHandler with ContextVar recursion guard.
+    """LoggingHandler with ContextVar recursion guard and redacted export attributes.
 
-    Backport of opentelemetry-python-contrib #4302.
+    Backport of opentelemetry-python-contrib #4302, plus: `LoggingHandler._translate()`
+    reads log record attributes via `_get_attributes(record)` independently of
+    `self.format(record)` - so wrapping the formatter in `RedactingFormatter` only
+    redacts the exported body string, not the `attributes` dict sent to the OTel
+    backend. Override `_get_attributes` to redact those too.
     """
+
+    @staticmethod
+    def _get_attributes(record: logging.LogRecord) -> dict:
+        from datarobot_opentelemetry.logging import redact_attributes
+
+        attributes = LoggingHandler._get_attributes(record)
+        return redact_attributes(dict(attributes))
 
     def emit(self, record: logging.LogRecord) -> None:
         if _otel_handler_active.get():
@@ -223,7 +234,18 @@ class OTel:
         self._initialized = True
 
     def configure(self, config: OTelConfig) -> ConfigureResult:
-        """Apply OTel settings from app config. Call once during app startup."""
+        """Apply OTel settings from app config. Call once during app startup.
+
+        A second call is a no-op (returns the result from the first call) rather than
+        re-running provider/handler setup - `configure_providers()` and
+        `_replace_export_handler_with_redacting()` are not idempotent themselves,
+        so re-entry would stack a second `_SafeLoggingHandler` on the root logger and
+        export every log record twice.
+        """
+        if self._configured:
+            assert self._result is not None
+            return self._result
+
         if config.otel_exporter_otlp_endpoint:
             os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
                 config.otel_exporter_otlp_endpoint
