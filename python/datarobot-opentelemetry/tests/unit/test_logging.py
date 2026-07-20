@@ -168,6 +168,17 @@ def test_redact_attributes_redacts_nested_dict_value() -> None:
     assert redacted == {"payload": {"api_key": "[REDACTED]", "ok": "value"}}
 
 
+def test_redact_attributes_redacts_secret_embedded_in_free_text() -> None:
+    # Regression test: a secret embedded as plain text inside a non-sensitive-keyed
+    # string value (e.g. an exception message like "Auth failed, api_key=secret")
+    # used to survive completely - key-based redaction only caught it when the
+    # *key itself* was sensitive, never when it was buried inside a string value.
+    redacted = redact_attributes(
+        {"exception.message": "Auth failed, api_key=super-secret-token"}
+    )
+    assert redacted == {"exception.message": "Auth failed, api_key=[REDACTED]"}
+
+
 def test_init_logging_wires_redacting_formatter_by_default() -> None:
     root_logger = logging.getLogger()
     original_handlers = root_logger.handlers[:]

@@ -12,6 +12,7 @@
 
 import logging
 import os
+import sys
 from dataclasses import dataclass
 
 import pytest
@@ -326,6 +327,32 @@ def test_safe_logging_handler_redacts_exported_attributes() -> None:
     attributes = _SafeLoggingHandler._get_attributes(record)
 
     assert attributes["api_key"] == "[REDACTED]"
+
+
+def test_safe_logging_handler_redacts_secret_embedded_in_exception_message() -> None:
+    """Regression test: a secret embedded as free text in an exception message (e.g.
+    raise ValueError(f"Auth failed, api_key={token}")) is not caught by key-based
+    redaction - the OTel SDK's _get_attributes derives exception.message/
+    exception.stacktrace from str(exc) and the traceback text, not from a dict key
+    named "api_key". Confirmed empirically before this fix: the secret went out
+    verbatim in both attributes."""
+    try:
+        raise ValueError("Auth failed, api_key=super-secret-token")
+    except ValueError:
+        record = logging.LogRecord(
+            name="test.logger",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="call failed",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+
+    attributes = _SafeLoggingHandler._get_attributes(record)
+
+    assert "super-secret-token" not in attributes["exception.message"]
+    assert "super-secret-token" not in attributes["exception.stacktrace"]
 
 
 def test_shutdown_without_configuring_is_a_no_op() -> None:

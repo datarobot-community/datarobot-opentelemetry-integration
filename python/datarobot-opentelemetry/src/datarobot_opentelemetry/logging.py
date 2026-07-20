@@ -171,10 +171,36 @@ class TextFormatter(logging.Formatter):
 SENSITIVE_LOG_KEYS: List[str] = ["access_token", "refresh_token", "api_key"]
 
 
+def _build_key_value_patterns(
+    sensitive_keys: List[str],
+) -> List[Tuple[str, "re.Pattern[str]"]]:
+    """Build `key=value` regexes for catching secrets embedded in free text."""
+    return [
+        (key, re.compile(rf"{re.escape(key)}=(['\"]?)([^'\"\s,)}}]+)\1", re.IGNORECASE))
+        for key in sensitive_keys
+    ]
+
+
+_SENSITIVE_KEY_VALUE_PATTERNS = _build_key_value_patterns(SENSITIVE_LOG_KEYS)
+
+
+def _redact_string(value: str, sensitive_keys: List[str]) -> str:
+    patterns = (
+        _SENSITIVE_KEY_VALUE_PATTERNS
+        if sensitive_keys is SENSITIVE_LOG_KEYS
+        else _build_key_value_patterns(sensitive_keys)
+    )
+    for key, pattern in patterns:
+        value = pattern.sub(rf"{key}=\1[REDACTED]\1", value)
+    return value
+
+
 def redact_value(obj: Any, sensitive_keys: List[str] = SENSITIVE_LOG_KEYS) -> Any:
     """
-    Recursively redact sensitive information from dictionaries and objects.
-    Returns a new object with redacted values without mutating the original.
+    Recursively redact sensitive information from dictionaries, objects, and free-text
+    strings (e.g. an exception message containing "api_key=secret" as plain text, not
+    a structured field). Returns a new object with redacted values without mutating the
+    original.
     """
     if isinstance(obj, dict):
         return {
@@ -183,6 +209,8 @@ def redact_value(obj: Any, sensitive_keys: List[str] = SENSITIVE_LOG_KEYS) -> An
         }
     elif isinstance(obj, (list, tuple)):
         return type(obj)(redact_value(item, sensitive_keys) for item in obj)
+    elif isinstance(obj, str):
+        return _redact_string(obj, sensitive_keys)
     elif hasattr(obj, "__dict__"):
         # create a shallow copy first to avoid mutating the original
         try:
@@ -219,13 +247,7 @@ class RedactingFormatter(logging.Formatter):
     def __init__(self, original_formatter: logging.Formatter):
         super().__init__()
         self.original_formatter = original_formatter
-        self.patterns: List[Tuple[str, "re.Pattern[str]"]] = []
-        for key in self.sensitive_keys:
-            # Match key='value' or key="value" or key=value
-            pattern = re.compile(
-                rf"{re.escape(key)}=(['\"]?)([^'\"\s,)}}]+)\1", re.IGNORECASE
-            )
-            self.patterns.append((key, pattern))
+        self.patterns = _build_key_value_patterns(self.sensitive_keys)
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the record, redacting sensitive keys from attributes and their string reprs."""
