@@ -25,6 +25,14 @@ All notable changes to this project are documented in this file.
   handler, and returns `ConfigureResult` with every signal `False`, so an app without
   telemetry configured (e.g. local development) still starts and logs normally.
 
+### Fixed
+
+- `TextFormatter`/`ReadableFormatter` now indent every continuation line of the final
+  formatted message, not just exception tracebacks. The DataRobot OTel collector's
+  recombine operator splits any line that doesn't start with whitespace into its own
+  record, so a plain multi-line `logger.info(...)` call (e.g. `log_api_call`'s banner)
+  was getting split apart the same way an unindented traceback used to.
+
 ## [0.2.1] - 2026-06-017
 
 ### Added

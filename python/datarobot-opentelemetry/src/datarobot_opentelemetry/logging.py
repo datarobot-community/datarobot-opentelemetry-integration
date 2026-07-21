@@ -35,6 +35,32 @@ from datarobot_opentelemetry.enums import FormatType, LogLevel
 
 _READABLE_INDENT = "   "
 
+
+def _indent_bare_continuation_lines(text: str) -> str:
+    """Indent every line after the first that doesn't already start with whitespace.
+
+    The DataRobot OTel collector's recombine operator treats any line that
+    doesn't start with whitespace as the start of a new log record
+    (`is_first_entry: 'body matches "^[^\\s]"'`). Any multi-line log body -
+    not just exception tracebacks, e.g. a hand-rolled banner like
+    "\\n====\\nAPI CALL COMPLETE\\n====\\n" - gets split into separate,
+    severity-less records unless every continuation line is indented. Lines
+    that are already indented (e.g. a formatter that hand-indents a
+    traceback block) are left alone to avoid double-indenting.
+    """
+    lines = text.split("\n")
+    if len(lines) == 1:
+        return text
+    return (
+        lines[0]
+        + "\n"
+        + "\n".join(
+            line if not line or line[0].isspace() else _READABLE_INDENT + line
+            for line in lines[1:]
+        )
+    )
+
+
 _STANDARD_LOG_RECORD_ATTRS = set(
     logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys()
 )
@@ -121,12 +147,14 @@ class ReadableFormatter(logging.Formatter):
             extra_str = " | ".join(f"{k}={v}" for k, v in extra_fields.items())
             first_line = f"{first_line} | {extra_str}"
         if not (record.exc_info and record.exc_info[0]):
-            return first_line
+            return _indent_bare_continuation_lines(first_line)
         tb_str = "".join(traceback.format_exception(*record.exc_info))
         tb_indented = "\n".join(
             _READABLE_INDENT + line for line in tb_str.rstrip().split("\n")
         )
-        return f"{first_line}\n{_READABLE_INDENT}exception:\n{tb_indented}"
+        return _indent_bare_continuation_lines(
+            f"{first_line}\n{_READABLE_INDENT}exception:\n{tb_indented}"
+        )
 
 
 class TextFormatter(logging.Formatter):
@@ -165,7 +193,7 @@ class TextFormatter(logging.Formatter):
             extra_str = " | ".join(f"{k}={v}" for k, v in extra_fields.items())
             message = f"{message} | {extra_str}"
 
-        return message
+        return _indent_bare_continuation_lines(message)
 
 
 SENSITIVE_LOG_KEYS: List[str] = ["access_token", "refresh_token", "api_key"]

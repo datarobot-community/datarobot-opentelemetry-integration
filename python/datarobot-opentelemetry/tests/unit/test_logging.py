@@ -109,6 +109,34 @@ def test_text_formatter_indents_every_traceback_line() -> None:
     assert "ValueError: boom" in formatted
 
 
+def test_text_formatter_indents_bare_multiline_message_without_exception() -> None:
+    # Regression test: a plain multi-line log call (e.g. a hand-rolled banner like
+    # log_api_call's "\n====\nAPI CALL COMPLETE\n====\n") has nothing to do with
+    # exceptions, so formatException's indentation never runs for it. The collector's
+    # recombine operator would still split it into separate, severity-less records
+    # unless format() itself indents every continuation line.
+    separator = f"\n{'=' * 20}\n"
+    record = _make_record(f"{separator}API CALL COMPLETE: foo{separator}")
+
+    formatted = TextFormatter("%(message)s").format(record)
+    lines = formatted.split("\n")
+    assert lines[0] == ""
+    for line in lines[1:]:
+        assert not line or line[:1].isspace(), f"unindented continuation line: {line!r}"
+    assert "API CALL COMPLETE: foo" in formatted
+
+
+def test_readable_formatter_indents_bare_multiline_message_without_exception() -> None:
+    separator = f"\n{'=' * 20}\n"
+    record = _make_record(f"{separator}API CALL COMPLETE: foo{separator}")
+
+    formatted = ReadableFormatter().format(record)
+    lines = formatted.split("\n")
+    for line in lines[1:]:
+        assert not line or line[:1].isspace(), f"unindented continuation line: {line!r}"
+    assert "API CALL COMPLETE: foo" in formatted
+
+
 def test_readable_formatter_single_line_without_exception() -> None:
     record = _make_record("hello")
     output = ReadableFormatter().format(record)
