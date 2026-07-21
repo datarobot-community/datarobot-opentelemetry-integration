@@ -25,18 +25,30 @@ this module only adds what's specific to FastAPI applications.
 from __future__ import annotations
 
 import contextvars
+import functools
+import inspect
 import logging
 import os
+import time
+from collections.abc import AsyncGenerator
+from collections.abc import Coroutine
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Callable
 from typing import Optional
+from typing import ParamSpec
 from typing import Protocol
+from typing import TypeVar
+from typing import no_type_check
+from typing import overload
 
 from opentelemetry import context
 from opentelemetry import metrics
 from opentelemetry import trace
 from opentelemetry._logs import get_logger_provider
+from opentelemetry.trace import Span
 from opentelemetry.instrumentation.logging.handler import (
     LoggingHandler as _InstrumentationLoggingHandler,
 )
@@ -73,6 +85,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _FASTAPI_EXCLUDED_URLS = r"//[^/]+/$,/health$,/assets/.*"
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+DEFAULT_EXCLUDED_TRACE_SPAN_NAMES: frozenset[str] = frozenset()
+"""Span names excluded from tracing by default.
+
+Empty by default - this is a shared library, not any one app, so it has no
+opinion on which spans are noisy. Apps add their own via the
+OTEL_EXCLUDED_TRACE_SPAN_NAMES env var (comma-separated).
+"""
 
 _otel_handler_active: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_otel_handler_active", default=False
@@ -306,6 +329,19 @@ class OTel:
         ):
             logging.getLogger(sdk_logger_name).addFilter(otlp_filter)
 
+    def _get_excluded_trace_span_names(self) -> frozenset[str]:
+        configured_span_names = {
+            span_name.strip()
+            for span_name in os.environ.get("OTEL_EXCLUDED_TRACE_SPAN_NAMES", "").split(
+                ","
+            )
+            if span_name.strip()
+        }
+        return DEFAULT_EXCLUDED_TRACE_SPAN_NAMES | configured_span_names
+
+    def _is_trace_span_excluded(self, span_name: str) -> bool:
+        return span_name in self._get_excluded_trace_span_names()
+
     def _log_otlp_warning(self) -> None:
         """Log a warning about OTLP connection failure (only once)."""
         if not self._otlp_warning_logged:
@@ -436,3 +472,235 @@ class OTel:
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.shutdown()
+
+    @overload
+    def trace(
+        self: "OTel",
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def trace(
+        self: "OTel",
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def trace(
+        self: "OTel",
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def trace(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @overload
+    def trace(self: "OTel", name: str) -> Callable[[Any], Any]: ...
+
+    @no_type_check
+    def trace(self: "OTel", func: Any) -> Any:
+        """
+        Wrap the execution of the decorated function in an OTel span.
+
+        Accepts an optional custom span name::
+
+            @otel.trace
+            async def my_handler(): ...
+
+            @otel.trace("custom-operation-name")
+            async def my_handler(): ...
+
+        WARNING: there are sharp edges with this decorator on functions that get
+        reflected on (e.g. via inspect.signature) - it changes the wrapped
+        callable's introspectable signature.
+        """
+        if isinstance(func, str):
+            return functools.partial(self._trace_with_name, span_name=func)
+        return self._trace_with_name(func)
+
+    @no_type_check
+    def _trace_with_name(
+        self: "OTel", func: Any, span_name: Optional[str] = None
+    ) -> Any:
+        name = span_name or f"{func.__module__}.{func.__qualname__}"
+
+        if self._is_trace_span_excluded(name):
+            return func
+
+        tracer = self.get_tracer("application-tracer")
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_inner(*args, **kwargs):
+                with tracer.start_as_current_span(name):
+                    return await func(*args, **kwargs)
+
+            return async_inner
+        elif inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def inner_asyncgen(*args, **kwargs):
+                with tracer.start_as_current_span(name):
+                    async for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_asyncgen
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def inner_gen(*args, **kwargs):
+                with tracer.start_as_current_span(name):
+                    for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_gen
+        elif inspect.isfunction(func):
+
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                with tracer.start_as_current_span(name):
+                    return func(*args, **kwargs)
+
+            return inner
+        else:
+            raise ValueError(
+                f"instrument can only decorate a function type, while {name} is a {type(func)}."
+            )
+
+    @functools.cache
+    def _function_histogram(self: "OTel", name: str) -> metrics.Histogram:
+        meter = self.get_meter("application-meter")
+        return meter.create_histogram(
+            f"function.{name}", "s", "A histogram recording function timings."
+        )
+
+    @contextmanager
+    def span(self, name: str, **attributes: Any) -> Generator[Span, None, None]:
+        """Create a named span as a context manager, with optional initial attributes.
+
+        Use this for ad-hoc spans within a function body where a decorator
+        would be too coarse-grained::
+
+            with otel.span("retrieve-documents", query=query_text) as span:
+                docs = retrieve(query_text)
+                span.set_attribute("doc_count", len(docs))
+        """
+        with self.get_tracer("application-tracer").start_as_current_span(
+            name
+        ) as active_span:
+            for key, value in attributes.items():
+                active_span.set_attribute(key, value)
+            yield active_span
+
+    @contextmanager
+    def time(self, name: str) -> Generator[None, None, None]:
+        start_time = time.time_ns()
+        success = True
+        try:
+            yield
+        except Exception:
+            success = False
+            raise
+        finally:
+            end_time = time.time_ns()
+            histogram = self._function_histogram(name)
+            histogram.record((end_time - start_time) / 1e9, {"success": success})
+
+    @overload
+    def meter(
+        self: "OTel",
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def meter(
+        self: "OTel",
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def meter(
+        self: "OTel",
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def meter(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @no_type_check
+    def meter(self: "OTel", func: Any) -> Any:
+        """
+        Wrap the execution of the decorated function in a timing histogram sharing
+        the function's own name.
+
+        WARNING: there are sharp edges with this decorator on functions that get
+        reflected on (e.g. via inspect.signature) - it changes the wrapped
+        callable's introspectable signature.
+        """
+        span_name = f"{func.__module__}.{func.__qualname__}"
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_inner(*args, **kwargs):
+                with self.time(span_name):
+                    return await func(*args, **kwargs)
+
+            return async_inner
+        elif inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def inner_asyncgen(*args, **kwargs):
+                with self.time(span_name):
+                    async for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_asyncgen
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def inner_gen(*args, **kwargs):
+                with self.time(span_name):
+                    for x in func(*args, **kwargs):
+                        yield x
+
+            return inner_gen
+        elif inspect.isfunction(func):
+
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                with self.time(span_name):
+                    return func(*args, **kwargs)
+
+            return inner
+        else:
+            raise ValueError(
+                f"instrument can only decorate a function type, while {span_name} is a {type(func)}."
+            )
+
+    @overload
+    def meter_and_trace(
+        self: "OTel",
+        func: Callable[P, Coroutine[T, None, None]],
+    ) -> Callable[P, Coroutine[T, None, None]]: ...
+
+    @overload
+    def meter_and_trace(
+        self: "OTel",
+        func: Callable[P, AsyncGenerator[T, None]],
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
+
+    @overload
+    def meter_and_trace(
+        self: "OTel",
+        func: Callable[P, Generator[T, None, None]],
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    @overload
+    def meter_and_trace(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+
+    @no_type_check
+    def meter_and_trace(self: "OTel", func: Any) -> Any:
+        """Apply both `meter` and `trace` to the decorated function."""
+        return functools.wraps(func)(self.meter(self.trace(func)))

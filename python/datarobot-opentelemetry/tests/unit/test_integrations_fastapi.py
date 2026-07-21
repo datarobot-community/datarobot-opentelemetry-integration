@@ -13,6 +13,8 @@
 import logging
 import os
 import sys
+from contextlib import AbstractContextManager
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 import pytest
@@ -419,3 +421,127 @@ def test_context_manager_shuts_down_on_exit(monkeypatch: pytest.MonkeyPatch) -> 
         pass
 
     assert shutdown_calls == [True]
+
+
+def test_excluded_trace_span_names_empty_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OTEL_EXCLUDED_TRACE_SPAN_NAMES", raising=False)
+    otel = OTel()
+    assert otel._get_excluded_trace_span_names() == frozenset()
+
+
+def test_excluded_trace_span_names_reads_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OTEL_EXCLUDED_TRACE_SPAN_NAMES", "app.noisy_span, app.other")
+    otel = OTel()
+    assert otel._get_excluded_trace_span_names() == {"app.noisy_span", "app.other"}
+
+
+def test_trace_decorator_skips_excluded_span_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OTEL_EXCLUDED_TRACE_SPAN_NAMES", "app.noisy_span")
+    otel = OTel()
+
+    def handler() -> str:
+        return "ok"
+
+    wrapped = otel.trace("app.noisy_span")(handler)
+
+    # An excluded span name means the function is returned unwrapped.
+    assert wrapped is handler
+    assert wrapped() == "ok"
+
+
+def test_trace_decorator_wraps_and_creates_span() -> None:
+    otel = OTel()
+    calls = []
+
+    @otel.trace
+    def handler(value: int) -> int:
+        calls.append(value)
+        return value * 2
+
+    assert handler(21) == 42
+    assert calls == [21]
+
+
+async def test_trace_decorator_wraps_async_function() -> None:
+    otel = OTel()
+
+    @otel.trace
+    async def handler() -> str:
+        return "ok"
+
+    assert await handler() == "ok"
+
+
+def test_trace_decorator_accepts_custom_span_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    otel = OTel()
+    seen_span_names = []
+
+    class _FakeTracer:
+        def start_as_current_span(self, name: str) -> AbstractContextManager[None]:
+            seen_span_names.append(name)
+            return nullcontext()
+
+    monkeypatch.setattr(otel, "get_tracer", lambda _name: _FakeTracer())
+
+    @otel.trace("custom-operation-name")
+    def handler() -> str:
+        return "ok"
+
+    assert handler() == "ok"
+    assert seen_span_names == ["custom-operation-name"]
+
+
+def test_span_context_manager_sets_attributes() -> None:
+    otel = OTel()
+
+    with otel.span("my-span", key="value") as active_span:
+        assert active_span is not None
+
+
+# Module-level with a short name: the `meter` decorator builds a metric name as
+# f"function.{func.__module__}.{func.__qualname__}", capped at OTel's 63-char
+# instrument name limit. A function nested inside a test picks up "<locals>" in
+# its qualname and blows that budget immediately - a real, pre-existing
+# constraint of this decorator, not something to route around inside the test.
+def _m() -> str:
+    return "ok"
+
+
+def _m_raises() -> None:
+    raise ValueError("boom")
+
+
+def test_time_context_manager_records_without_raising() -> None:
+    otel = OTel()
+    with otel.time("my-timed-block"):
+        pass
+
+
+def test_time_context_manager_reraises_on_exception() -> None:
+    otel = OTel()
+    with pytest.raises(ValueError, match="boom"), otel.time("my-timed-block"):
+        raise ValueError("boom")
+
+
+def test_meter_decorator_records_without_raising() -> None:
+    otel = OTel()
+    assert otel.meter(_m)() == "ok"
+
+
+def test_meter_decorator_records_on_exception() -> None:
+    otel = OTel()
+    with pytest.raises(ValueError, match="boom"):
+        otel.meter(_m_raises)()
+
+
+def test_meter_and_trace_applies_both() -> None:
+    otel = OTel()
+    assert otel.meter_and_trace(_m)() == "ok"
