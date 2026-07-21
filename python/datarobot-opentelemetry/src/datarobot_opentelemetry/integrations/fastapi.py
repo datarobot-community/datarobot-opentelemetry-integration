@@ -141,11 +141,25 @@ class _SafeLoggingHandler(_SDKLoggingHandler):
             _otel_handler_active.reset(token)
 
 
+_OTLP_EXPORTER_LOGGER_NAMES = frozenset(
+    {
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        "opentelemetry.exporter.otlp.proto.http._log_exporter",
+        "opentelemetry.exporter.otlp.proto.http.metric_exporter",
+    }
+)
+
+
 class OTLPConnectionErrorFilter(logging.Filter):
     """
-    Filter to suppress connection errors from urllib3/requests when the OTLP collector is
-    unavailable, so a misconfigured or unreachable endpoint doesn't spam application logs
-    with connection-refused noise on every export attempt.
+    Filter to suppress OTLP export failure noise so a misconfigured or unreachable
+    collector doesn't spam application logs on every export attempt. Covers two distinct
+    failure modes: the endpoint being completely unreachable (connection-refused errors
+    from urllib3/requests, or wrapped in an opentelemetry.sdk exception chain), and the
+    endpoint being reachable but rejecting the request (the exporters' own "Failed to
+    export ... batch" errors, e.g. a 404 from a misconfigured path). Either way, retrying
+    won't help without a config change, so this warns once via `warning_callback` and
+    suppresses the rest.
     """
 
     def __init__(self, warning_callback: Optional[Callable[[], None]] = None):
@@ -169,6 +183,12 @@ class OTLPConnectionErrorFilter(logging.Filter):
             message = record.getMessage()
             if "ConnectionError" in message and ":4318" in message:
                 should_suppress = True
+
+        if (
+            record.name in _OTLP_EXPORTER_LOGGER_NAMES
+            and record.levelno == logging.ERROR
+        ):
+            should_suppress = True
 
         if (
             not should_suppress
@@ -326,6 +346,7 @@ class OTel:
             "opentelemetry.sdk._logs._internal.export",
             "opentelemetry.sdk.trace.export",
             "opentelemetry.sdk.metrics._internal.export",
+            *_OTLP_EXPORTER_LOGGER_NAMES,
         ):
             logging.getLogger(sdk_logger_name).addFilter(otlp_filter)
 
@@ -343,13 +364,13 @@ class OTel:
         return span_name in self._get_excluded_trace_span_names()
 
     def _log_otlp_warning(self) -> None:
-        """Log a warning about OTLP connection failure (only once)."""
+        """Log a warning about OTLP export failure (only once)."""
         if not self._otlp_warning_logged:
             self._otlp_warning_logged = True
             logger.warning(
-                "OTLP collector connection failed. Telemetry data may be lost. "
-                "Suppressing further connection errors to prevent log spam. "
-                "Check OTEL_EXPORTER_OTLP_ENDPOINT configuration."
+                "OTLP export failed (collector unreachable or rejected the request). "
+                "Telemetry data may be lost. Suppressing further export errors to "
+                "prevent log spam. Check OTEL_EXPORTER_OTLP_ENDPOINT configuration."
             )
 
     def _setup_auto_instrumentation(self) -> None:
@@ -401,7 +422,9 @@ class OTel:
 
         try:
             FastAPIInstrumentor.instrument_app(
-                app, excluded_urls=_FASTAPI_EXCLUDED_URLS
+                app,
+                excluded_urls=_FASTAPI_EXCLUDED_URLS,
+                exclude_spans=["send", "receive"],
             )
             logger.info("Auto-instrumentation enabled for FastAPI application")
         except Exception as e:

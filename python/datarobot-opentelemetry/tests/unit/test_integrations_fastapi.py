@@ -27,11 +27,22 @@ from opentelemetry.sdk._logs import LoggingHandler
 
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
 from datarobot_opentelemetry.integrations.fastapi import (
+    _OTLP_EXPORTER_LOGGER_NAMES,
     OTel,
     OTelConfig,
+    OTLPConnectionErrorFilter,
     _SafeLoggingHandler,
 )
 from datarobot_opentelemetry.logging import RedactingFormatter
+
+_OTLP_FILTERED_LOGGER_NAMES = (
+    "urllib3.connectionpool",
+    "requests",
+    "opentelemetry.sdk._logs._internal.export",
+    "opentelemetry.sdk.trace.export",
+    "opentelemetry.sdk.metrics._internal.export",
+    *_OTLP_EXPORTER_LOGGER_NAMES,
+)
 
 _ENTITY_HEADER = "x-datarobot-entity-id"
 _API_KEY_HEADER = "x-datarobot-api-key"
@@ -56,6 +67,11 @@ def _reset_otel_singleton() -> None:
     OTel._instance = None
     OTel._initialized = False
     OTel._auto_instrumentation_setup = False
+    for logger_name in _OTLP_FILTERED_LOGGER_NAMES:
+        target_logger = logging.getLogger(logger_name)
+        for existing_filter in list(target_logger.filters):
+            if isinstance(existing_filter, OTLPConnectionErrorFilter):
+                target_logger.removeFilter(existing_filter)
 
 
 def _uninstrument_all() -> None:
@@ -400,6 +416,99 @@ def test_instrument_fastapi_app_warns_when_instrumentor_unavailable(
         otel.instrument_fastapi_app(object())  # type: ignore[arg-type]
 
     assert "FastAPIInstrumentor not available" in caplog.text
+
+
+def test_instrument_fastapi_app_excludes_send_receive_spans(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple, dict]] = []
+
+    class FakeFastAPIInstrumentor:
+        @staticmethod
+        def instrument_app(*args: object, **kwargs: object) -> None:
+            calls.append((args, kwargs))
+
+    monkeypatch.setattr(
+        "datarobot_opentelemetry.integrations.fastapi.FastAPIInstrumentor",
+        FakeFastAPIInstrumentor,
+    )
+
+    otel = OTel()
+    otel.instrument_fastapi_app(object())  # type: ignore[arg-type]
+
+    assert len(calls) == 1
+    _, kwargs = calls[0]
+    assert kwargs["exclude_spans"] == ["send", "receive"]
+
+
+@pytest.mark.parametrize(
+    "logger_name",
+    [
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        "opentelemetry.exporter.otlp.proto.http._log_exporter",
+        "opentelemetry.exporter.otlp.proto.http.metric_exporter",
+    ],
+)
+def test_otlp_connection_error_filter_suppresses_exporter_batch_failures(
+    logger_name: str,
+) -> None:
+    # The filter itself calls warning_callback on every suppressed record - dedup to
+    # "only once" is the caller's responsibility (see OTel._log_otlp_warning below).
+    warnings: list[None] = []
+    otlp_filter = OTLPConnectionErrorFilter(lambda: warnings.append(None))
+    record = logging.LogRecord(
+        name=logger_name,
+        level=logging.ERROR,
+        pathname=__file__,
+        lineno=1,
+        msg="Failed to export span batch code: 404, reason: NOT FOUND",
+        args=None,
+        exc_info=None,
+    )
+
+    first = otlp_filter.filter(record)
+    second = otlp_filter.filter(record)
+
+    assert first is False
+    assert second is False
+    assert len(warnings) == 2
+
+
+def test_otel_suppresses_repeated_exporter_batch_failures_end_to_end(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Integration-level check that OTel._install_otlp_error_filter actually wires the
+    # exporter loggers up to the filter, and that OTel's own dedup logs just one warning
+    # no matter how many batches fail.
+    OTel()  # constructing the singleton installs the exporter-logger filter
+    exporter_logger = logging.getLogger(
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+    )
+
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            exporter_logger.error(
+                "Failed to export span batch code: 404, reason: NOT FOUND"
+            )
+
+    assert "reason: NOT FOUND" not in caplog.text
+    warning_lines = [r for r in caplog.records if "OTLP export failed" in r.message]
+    assert len(warning_lines) == 1
+
+
+def test_otlp_connection_error_filter_leaves_unrelated_exporter_logs_alone() -> None:
+    otlp_filter = OTLPConnectionErrorFilter()
+    record = logging.LogRecord(
+        name="opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="Export succeeded",
+        args=None,
+        exc_info=None,
+    )
+
+    assert otlp_filter.filter(record) is True
 
 
 def test_log_application_start_only_logs_once(caplog: pytest.LogCaptureFixture) -> None:

@@ -24,6 +24,13 @@ All notable changes to this project are documented in this file.
   or entity id are missing. It now logs a warning, falls back to a basic stdout logging
   handler, and returns `ConfigureResult` with every signal `False`, so an app without
   telemetry configured (e.g. local development) still starts and logs normally.
+- `instrument_fastapi_app()` now passes `exclude_spans=["send", "receive"]` to
+  `FastAPIInstrumentor`, dropping the noisy low-level ASGI spans it otherwise creates
+  for every message exchanged during a request/response cycle.
+- `OTLPConnectionErrorFilter` now also suppresses the OTLP exporters' own "Failed to
+  export ... batch" errors (e.g. a 404 from a misconfigured endpoint path), not just
+  connection-refused failures. Previously these were a different failure mode the
+  filter didn't cover, so a reachable-but-wrong endpoint still spammed logs forever.
 
 ### Fixed
 
