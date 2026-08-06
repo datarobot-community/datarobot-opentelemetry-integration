@@ -328,7 +328,7 @@ integrations = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "datarobot-opentelemetry", extra = ["fastapi", "integrations"] },
+    { name = "datarobot-opentelemetry", extra = ["fastapi"] },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -351,7 +351,7 @@ provides-extras = ["integrations", "fastapi"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "datarobot-opentelemetry", extras = ["integrations", "fastapi"] },
+    { name = "datarobot-opentelemetry", extras = ["fastapi"] },
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },

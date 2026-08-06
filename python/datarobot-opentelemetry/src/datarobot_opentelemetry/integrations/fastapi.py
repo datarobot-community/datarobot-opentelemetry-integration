@@ -13,13 +13,15 @@
 # mypy: disable-error-code=import-not-found
 
 """
-FastAPI integration for DataRobot Custom Applications.
+FastAPI integration for OpenTelemetry.
 
 Layers FastAPI/httpx/requests/SQLAlchemy auto-instrumentation and redacted
 log export on top of `datarobot_opentelemetry.integrations.configure()`,
 instead of re-implementing OTel provider setup. `configure()` remains the
 single place that builds Trace/Log/Metric providers and OTLP exporters;
-this module only adds what's specific to FastAPI applications.
+this module only adds what's specific to FastAPI applications. DataRobot
+Custom Applications are the primary consumer today, but nothing here is
+Custom-Application-specific.
 """
 
 from __future__ import annotations
