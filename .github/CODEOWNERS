@@ -1,0 +1,5 @@
+# This file defines which domain owns what parts of the
+# repository. The syntax is the same as defined in
+
+# Default owners for everything in the repo.
+* @datarobot-oss/mmm
