@@ -21,7 +21,7 @@
 # co-owns these, since af-component-fastapi-backend and the app templates built on
 # it are the primary consumers.
 /python/datarobot-opentelemetry/src/datarobot_opentelemetry/instrumentations/  @datarobot/model-management @datarobot/applications
-/python/datarobot-opentelemetry/src/datarobot_opentelemetry/logging.py        @datarobot/model-management @datarobot/applications
-/python/datarobot-opentelemetry/tests/unit/test_instrumentations_fastapi.py  @datarobot/model-management @datarobot/applications
-/python/datarobot-opentelemetry/tests/unit/test_instrumentations_uvicorn.py  @datarobot/model-management @datarobot/applications
-/python/datarobot-opentelemetry/tests/unit/test_logging.py                  @datarobot/model-management @datarobot/applications
+/python/datarobot-opentelemetry/src/datarobot_opentelemetry/logging.py         @datarobot/model-management @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_instrumentations_fastapi.py    @datarobot/model-management @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_instrumentations_uvicorn.py    @datarobot/model-management @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_logging.py                     @datarobot/model-management @datarobot/applications
