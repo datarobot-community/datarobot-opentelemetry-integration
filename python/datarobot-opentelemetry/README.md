@@ -126,6 +126,8 @@ Trace/Log/Metric providers; this module adds what's specific to FastAPI applicat
 ### Basic setup
 
 ```python
+from fastapi import FastAPI
+
 from datarobot_opentelemetry.enums import EntityType
 from datarobot_opentelemetry.instrumentations.fastapi import OTel
 

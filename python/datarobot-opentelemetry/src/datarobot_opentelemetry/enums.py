@@ -23,6 +23,13 @@ class LogLevel(str, Enum):
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
 
+    # Python 3.11 changed Enum.__format__ for str-mixin enums to include the
+    # class name (f"{LogLevel.INFO}" -> "LogLevel.INFO" instead of "INFO").
+    # Pin both back to plain str behavior so interpolation is safe regardless
+    # of Python version.
+    __str__ = str.__str__
+    __format__ = str.__format__  # type: ignore[assignment]
+
 
 class EntityType(str, Enum):
     """Known DataRobot entity kinds observable via the OTel API.
@@ -35,3 +42,9 @@ class EntityType(str, Enum):
     DEPLOYMENT = "deployment"
     CUSTOM_APPLICATION = "custom_application"
     WORKLOAD = "workload"
+
+    # See LogLevel above: without this, f"{EntityType.CUSTOM_APPLICATION}"
+    # renders as "EntityType.CUSTOM_APPLICATION" on Python 3.11+, corrupting
+    # the X-DataRobot-Entity-Id header and service.name built from it.
+    __str__ = str.__str__
+    __format__ = str.__format__  # type: ignore[assignment]

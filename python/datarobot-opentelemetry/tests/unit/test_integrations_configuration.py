@@ -17,6 +17,7 @@ import types
 
 import pytest
 
+from datarobot_opentelemetry.enums import EntityType
 from datarobot_opentelemetry.integrations import configure
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
@@ -281,6 +282,25 @@ def test_configure_builds_dr_standard_resource_attributes(
     assert resource["datarobot.service.priority"] == "p1"
     assert resource["service.name"] == "deployment-abc-123"
     assert resource["datarobot.application.id"] == "abc-123"
+
+
+def test_configure_renders_entity_type_enum_correctly_in_service_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: str-mixin enums render as "EntityType.DEPLOYMENT" instead of
+    "deployment" under f-string interpolation on Python 3.11+ unless __format__ is
+    pinned back to str's. configure() builds service.name via f"{entity_type}-{id}",
+    so passing the EntityType enum (not just a plain string) must still produce a
+    clean value."""
+    _install_fake_opentelemetry(monkeypatch)
+    monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
+
+    from opentelemetry import trace
+
+    configure("https://example.test", EntityType.DEPLOYMENT, "abc-123", api_key="token")
+
+    resource = trace.get_tracer_provider().resource
+    assert resource["service.name"] == "deployment-abc-123"
 
 
 def test_configure_succeeds_with_fake_opentelemetry(
