@@ -7,4 +7,4 @@ except PackageNotFoundError:
 
 from datarobot_opentelemetry.semconv import DataRobotOtelHeaders, SpanAttributes
 
-__all__ = ["SpanAttributes", "DataRobotOtelHeaders", "__version__"]
+__all__ = ["DataRobotOtelHeaders", "SpanAttributes", "__version__"]
