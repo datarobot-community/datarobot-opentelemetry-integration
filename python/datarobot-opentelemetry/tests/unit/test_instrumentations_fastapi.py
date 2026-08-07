@@ -25,8 +25,9 @@ from opentelemetry.instrumentation.logging.handler import (
 )
 from opentelemetry.sdk._logs import LoggingHandler
 
+from datarobot_opentelemetry.enums import EntityType
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
-from datarobot_opentelemetry.integrations.fastapi import (
+from datarobot_opentelemetry.instrumentations.fastapi import (
     _OTLP_EXPORTER_LOGGER_NAMES,
     OTel,
     OTelConfig,
@@ -61,6 +62,23 @@ class FakeOTelConfig:
     otel_exporter_otlp_endpoint: str = ""
     otel_exporter_otlp_headers: str = ""
     otel_sdk_disabled: bool = False
+
+
+class TestEntityTypeDefault:
+    def test_defaults_to_custom_application(self):
+        otel = OTel()
+        assert otel.entity_type == EntityType.CUSTOM_APPLICATION
+        assert otel.entity_type == "custom_application"
+
+    def test_accepts_enum_member(self):
+        otel = OTel(entity_type=EntityType.DEPLOYMENT)
+        assert otel.entity_type == "deployment"
+
+    def test_accepts_plain_string_for_unlisted_types(self):
+        # Not every entity type is enumerated; the platform can introduce new
+        # ones before this enum is updated, so a plain string must keep working.
+        otel = OTel(entity_type="future_entity_kind")
+        assert otel.entity_type == "future_entity_kind"
 
 
 def _reset_otel_singleton() -> None:
@@ -150,7 +168,7 @@ def test_configure_disabled_via_sdk_disabled_skips_delegation(
         )
 
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+        "datarobot_opentelemetry.instrumentations.fastapi.configure_providers",
         _fail_if_called,
     )
 
@@ -190,7 +208,7 @@ def test_configure_delegates_to_configure_providers(
         )
 
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+        "datarobot_opentelemetry.instrumentations.fastapi.configure_providers",
         _fake_configure_providers,
     )
 
@@ -223,7 +241,7 @@ def test_configure_second_call_is_a_no_op(monkeypatch: pytest.MonkeyPatch) -> No
         )
 
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+        "datarobot_opentelemetry.instrumentations.fastapi.configure_providers",
         _fake_configure_providers,
     )
 
@@ -245,7 +263,7 @@ def test_configure_telemetry_disabled_when_nothing_gets_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+        "datarobot_opentelemetry.instrumentations.fastapi.configure_providers",
         lambda **_: ConfigureResult(
             tracing_configured=False, metrics_configured=False, logger_configured=False
         ),
@@ -268,7 +286,7 @@ def test_configure_replaces_plain_logging_handler_with_redacting(
     root_logger.addHandler(plain_handler)
     try:
         monkeypatch.setattr(
-            "datarobot_opentelemetry.integrations.fastapi.configure_providers",
+            "datarobot_opentelemetry.instrumentations.fastapi.configure_providers",
             lambda **_: ConfigureResult(
                 tracing_configured=False,
                 metrics_configured=False,
@@ -391,7 +409,7 @@ def test_shutdown_calls_shutdown_on_configured_providers(
     monkeypatch.setattr(metrics, "get_meter_provider", lambda: FakeProvider())
     monkeypatch.setattr(_logs, "get_logger_provider", lambda: FakeProvider())
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.get_logger_provider",
+        "datarobot_opentelemetry.instrumentations.fastapi.get_logger_provider",
         lambda: FakeProvider(),
     )
 
@@ -408,7 +426,7 @@ def test_instrument_fastapi_app_warns_when_instrumentor_unavailable(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.FastAPIInstrumentor", None
+        "datarobot_opentelemetry.instrumentations.fastapi.FastAPIInstrumentor", None
     )
 
     otel = OTel()
@@ -429,7 +447,7 @@ def test_instrument_fastapi_app_excludes_send_receive_spans(
             calls.append((args, kwargs))
 
     monkeypatch.setattr(
-        "datarobot_opentelemetry.integrations.fastapi.FastAPIInstrumentor",
+        "datarobot_opentelemetry.instrumentations.fastapi.FastAPIInstrumentor",
         FakeFastAPIInstrumentor,
     )
 

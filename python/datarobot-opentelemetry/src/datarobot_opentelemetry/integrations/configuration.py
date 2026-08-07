@@ -18,6 +18,8 @@ import sys
 from dataclasses import dataclass
 from typing import cast
 
+from datarobot_opentelemetry.enums import EntityType
+from datarobot_opentelemetry.logging import RedactingFormatter
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
 logger = logging.getLogger(__name__)
@@ -32,8 +34,6 @@ class ConfigureResult:
 
 def _configure_stdout_fallback_logging(log_level: int) -> None:
     """Attach a basic stdout handler so logs stay visible when OTLP export can't be configured."""
-    from datarobot_opentelemetry.logging import RedactingFormatter
-
     root_logger = logging.getLogger()
     if root_logger.handlers:
         return
@@ -49,7 +49,7 @@ def _configure_stdout_fallback_logging(log_level: int) -> None:
 
 def configure(
     endpoint: str | None = None,
-    entity_type: str | None = None,
+    entity_type: EntityType | str | None = None,
     entity_id: str | None = None,
     api_key: str | None = None,
     log_level: int = logging.INFO,
@@ -60,7 +60,9 @@ def configure(
 
     Args:
         endpoint (str): The endpoint URL for the telemetry data.
-        entity_type (str): The type of the entity being monitored (e.g., "deployment", "workload").
+        entity_type (EntityType | str): The type of the entity being monitored, e.g.
+            EntityType.DEPLOYMENT or EntityType.WORKLOAD. Accepts any string too, since
+            the platform can introduce entity kinds before this enum is updated.
         entity_id (str): The unique identifier for the entity being monitored.
         api_key (Optional[str]): An optional API key for authentication, if required by the telemetry backend.
         log_level (int): The logging level for the OpenTelemetry integration. Defaults to logging.INFO.

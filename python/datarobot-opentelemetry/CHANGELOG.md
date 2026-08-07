@@ -6,8 +6,8 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- `fastapi` extra with a new `datarobot_opentelemetry.integrations.fastapi` module: an
-  `OTel` manager for FastAPI Custom Applications that layers FastAPI/httpx/requests/
+- `fastapi` extra with a new `datarobot_opentelemetry.instrumentations.fastapi` module: an
+  `OTel` manager for FastAPI applications that layers FastAPI/httpx/requests/
   SQLAlchemy auto-instrumentation and redacted log export on top of `configure()`,
   instead of re-implementing provider setup. Includes `trace`/`meter`/`meter_and_trace`
   decorators, `span`/`time` context managers, and `OTEL_EXCLUDED_TRACE_SPAN_NAMES`-based
@@ -15,7 +15,7 @@ All notable changes to this project are documented in this file.
 - `datarobot_opentelemetry.logging` module with structured (`json`/`text`/`readable`)
   log formatters, `RedactingFormatter` for stripping sensitive values from log output,
   and a `log_api_call` decorator.
-- `datarobot_opentelemetry.integrations.uvicorn.configure_uvicorn_logging` to route
+- `datarobot_opentelemetry.instrumentations.uvicorn.configure_uvicorn_logging` to route
   uvicorn's access/error loggers through the same formatters and redaction.
 
 ### Changed

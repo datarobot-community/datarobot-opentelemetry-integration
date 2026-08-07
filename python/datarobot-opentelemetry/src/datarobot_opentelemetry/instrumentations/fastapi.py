@@ -56,10 +56,12 @@ from opentelemetry.instrumentation.logging.handler import (
 )
 from opentelemetry.sdk._logs import LoggingHandler as _SDKLoggingHandler
 
+from datarobot_opentelemetry.enums import EntityType
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
 from datarobot_opentelemetry.integrations.configuration import (
     configure as configure_providers,
 )
+from datarobot_opentelemetry.logging import RedactingFormatter, redact_attributes
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -128,8 +130,6 @@ class _SafeLoggingHandler(_SDKLoggingHandler):
 
     @staticmethod
     def _get_attributes(record: logging.LogRecord) -> dict[str, Any]:
-        from datarobot_opentelemetry.logging import redact_attributes
-
         attributes = _SDKLoggingHandler._get_attributes(record)
         return redact_attributes(dict(attributes))
 
@@ -230,8 +230,6 @@ def _replace_export_handler_with_redacting(log_level: int) -> None:
     attached for `_SafeLoggingHandler` wrapped in `RedactingFormatter` so nothing bypasses
     redaction, while still reusing the LoggerProvider/exporter `configure()` already built.
     """
-    from datarobot_opentelemetry.logging import RedactingFormatter
-
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
         if isinstance(
@@ -260,14 +258,18 @@ class OTel:
     _auto_instrumentation_setup: bool = False
 
     def __new__(
-        cls, entity_type: str = "custom_application", entity_id: Optional[str] = None
+        cls,
+        entity_type: EntityType | str = EntityType.CUSTOM_APPLICATION,
+        entity_id: Optional[str] = None,
     ) -> "OTel":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(
-        self, entity_type: str = "custom_application", entity_id: Optional[str] = None
+        self,
+        entity_type: EntityType | str = EntityType.CUSTOM_APPLICATION,
+        entity_id: Optional[str] = None,
     ):
         if self._initialized:
             return

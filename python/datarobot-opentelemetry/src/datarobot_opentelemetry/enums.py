@@ -22,3 +22,16 @@ class LogLevel(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class EntityType(str, Enum):
+    """Known DataRobot entity kinds observable via the OTel API.
+
+    Not exhaustive by construction: callers may still pass any string, since
+    the platform can introduce new entity kinds before this enum is updated.
+    """
+
+    EXPERIMENT_CONTAINER = "experiment_container"
+    DEPLOYMENT = "deployment"
+    CUSTOM_APPLICATION = "custom_application"
+    WORKLOAD = "workload"

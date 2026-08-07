@@ -12,7 +12,7 @@
 
 import logging
 
-from datarobot_opentelemetry.integrations.uvicorn import (
+from datarobot_opentelemetry.instrumentations.uvicorn import (
     HealthCheckFilter,
     configure_uvicorn_logging,
 )
