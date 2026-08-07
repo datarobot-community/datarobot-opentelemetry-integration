@@ -125,9 +125,11 @@ def configure(
 
         entity_type = None
         entity_id = None
-        if (dr_service_name := env_headers.get(
-            DataRobotOtelHeaders.ENTITY_ID.lower(), ""
-        )) and "-" in dr_service_name:
+        if (
+            dr_service_name := env_headers.get(
+                DataRobotOtelHeaders.ENTITY_ID.lower(), ""
+            )
+        ) and "-" in dr_service_name:
             # If it contains a hyphen, we assume it's an entity identifier in the format "type-id" and split it.
             parts = dr_service_name.split("-", 1)
             entity_type = parts[0]
