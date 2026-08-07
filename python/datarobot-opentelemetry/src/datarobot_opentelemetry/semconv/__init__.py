@@ -1,4 +1,4 @@
 from .headers import DataRobotOtelHeaders
 from .traces import SpanAttributes
 
-__all__ = ["SpanAttributes", "DataRobotOtelHeaders"]
+__all__ = ["DataRobotOtelHeaders", "SpanAttributes"]
