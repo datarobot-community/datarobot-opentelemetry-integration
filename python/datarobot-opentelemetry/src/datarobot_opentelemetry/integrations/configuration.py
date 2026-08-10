@@ -14,9 +14,12 @@
 
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from typing import cast
 
+from datarobot_opentelemetry.enums import EntityType
+from datarobot_opentelemetry.logging import RedactingFormatter
 from datarobot_opentelemetry.semconv.headers import DataRobotOtelHeaders
 
 logger = logging.getLogger(__name__)
@@ -29,9 +32,24 @@ class ConfigureResult:
     logger_configured: bool
 
 
+def _configure_stdout_fallback_logging(log_level: int) -> None:
+    """Attach a basic stdout handler so logs stay visible when OTLP export can't be configured."""
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        RedactingFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+    )
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level)
+
+
 def configure(
     endpoint: str | None = None,
-    entity_type: str | None = None,
+    entity_type: EntityType | str | None = None,
     entity_id: str | None = None,
     api_key: str | None = None,
     log_level: int = logging.INFO,
@@ -42,7 +60,9 @@ def configure(
 
     Args:
         endpoint (str): The endpoint URL for the telemetry data.
-        entity_type (str): The type of the entity being monitored (e.g., "deployment", "workload").
+        entity_type (EntityType | str): The type of the entity being monitored, e.g.
+            EntityType.DEPLOYMENT or EntityType.WORKLOAD. Accepts any string too, since
+            the platform can introduce entity kinds before this enum is updated.
         entity_id (str): The unique identifier for the entity being monitored.
         api_key (Optional[str]): An optional API key for authentication, if required by the telemetry backend.
         log_level (int): The logging level for the OpenTelemetry integration. Defaults to logging.INFO.
@@ -142,30 +162,40 @@ def configure(
     dr_api_key, dr_entity_type, dr_entity_id = _parse_dr_headers(otel_headers)
 
     endpoint = endpoint or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        raise ValueError(
-            "Endpoint is required for telemetry export. Provide it as an argument or set the OTEL_EXPORTER_OTLP_ENDPOINT environment variable."
-        )
-
     api_key = api_key or dr_api_key or os.environ.get("DATAROBOT_API_TOKEN")
-    if not api_key:
-        raise ValueError(
-            "API key is required for authentication. Provide it as an argument or set the DATAROBOT_API_TOKEN environment variable."
-        )
-
     entity_type = (
         entity_type or dr_entity_type or os.environ.get("DATAROBOT_ENTITY_TYPE")
     )
-    if not entity_type:
-        raise ValueError(
-            "Entity type is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_TYPE environment variable."
+    entity_id = entity_id or dr_entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
+
+    missing = [
+        name
+        for name, value in (
+            ("endpoint", endpoint),
+            ("api_key", api_key),
+            ("entity_type", entity_type),
+            ("entity_id", entity_id),
+        )
+        if not value
+    ]
+    if missing:
+        logger.warning(
+            "Skipping OTel export configuration, missing: %s. "
+            "Provide them as arguments or via OTEL_EXPORTER_OTLP_ENDPOINT / "
+            "DATAROBOT_API_TOKEN / DATAROBOT_ENTITY_TYPE / DATAROBOT_ENTITY_ID. "
+            "Falling back to stdout logging.",
+            ", ".join(missing),
+        )
+        _configure_stdout_fallback_logging(log_level)
+        return ConfigureResult(
+            tracing_configured=False,
+            metrics_configured=False,
+            logger_configured=False,
         )
 
-    entity_id = entity_id or dr_entity_id or os.environ.get("DATAROBOT_ENTITY_ID")
-    if not entity_id:
-        raise ValueError(
-            "Entity ID is required for telemetry context. Provide it as an argument or set the DATAROBOT_ENTITY_ID environment variable."
-        )
+    assert (
+        endpoint and api_key and entity_type and entity_id
+    )  # narrowed by the check above
 
     otel_headers[DataRobotOtelHeaders.ENTITY_ID.lower()] = f"{entity_type}-{entity_id}"
     otel_headers[DataRobotOtelHeaders.API_KEY.lower()] = api_key
@@ -178,15 +208,34 @@ def configure(
             return base_endpoint
         return f"{base_endpoint}{suffix}"
 
+    def _build_dr_resource() -> Resource:
+        """Build an OTel Resource with DataRobot-standard attributes.
+
+        Deliberately duplicates (not imports) datarobot.core.otel.create_dr_resource()
+        in public_api_client: that function's own logic is tiny and stable, but the
+        `datarobot` package it lives in unconditionally pulls in pandas/numpy as base
+        dependencies - too much weight to add to this package just to reuse ~15 lines
+        of attribute-building with no real logic of its own. Keep this in sync with
+        create_dr_resource() if that ever changes.
+        """
+        attrs: dict[str, str] = {"datarobot.service.priority": "p1"}
+        if not os.environ.get("OTEL_SERVICE_NAME"):
+            attrs["service.name"] = f"{entity_type}-{entity_id}"
+        attrs["datarobot.application.id"] = entity_id
+        if os.environ.get("KUBERNETES_SERVICE_HOST"):
+            pod_name = os.environ.get("HOSTNAME")
+            if pod_name:
+                attrs["k8s.pod.name"] = pod_name
+        version = os.environ.get("APP_VERSION") or os.environ.get("SERVICE_VERSION")
+        if version:
+            attrs["service.version"] = version
+        return Resource.create(attrs)
+
     tracing_configured = False
     metrics_configured = False
     logger_configured = False
 
-    base_resource = Resource.create(
-        {
-            "datarobot.service.priority": "p1",
-        }
-    )
+    base_resource = _build_dr_resource()
 
     # Configure tracing
     try:

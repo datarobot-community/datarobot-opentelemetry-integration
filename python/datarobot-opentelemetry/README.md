@@ -10,9 +10,12 @@ pip install datarobot-opentelemetry
 
 # Install with integration module for automatic OpenTelemetry setup
 pip install datarobot-opentelemetry[integrations]
+
+# Install with FastAPI instrumentation on top of the integration module
+pip install datarobot-opentelemetry[fastapi]
 ```
 
-The `[integrations]` extra includes all OpenTelemetry dependencies needed for the `configure()` function.
+The `[integrations]` extra includes all OpenTelemetry dependencies needed for the `configure()` function. The `[fastapi]` extra additionally includes FastAPI/httpx/requests/SQLAlchemy auto-instrumentation and pulls in `[integrations]` automatically.
 
 ## Usage
 
@@ -86,7 +89,7 @@ result = configure()
 ### Configuration parameters
 
 - **endpoint** (optional argument, required value): OTLP HTTP endpoint URL for telemetry data. If not passed, uses `OTEL_EXPORTER_OTLP_ENDPOINT`.
-- **entity_type** (optional argument, required value): Type of entity being monitored (e.g., "deployment", "workload"). If not passed, uses `DATAROBOT_ENTITY_TYPE`.
+- **entity_type** (optional argument, required value): Type of entity being monitored, e.g. `EntityType.DEPLOYMENT` or `EntityType.WORKLOAD` (`datarobot_opentelemetry.enums.EntityType`). Accepts any string too, since the platform can introduce entity kinds before this enum is updated. If not passed, uses `DATAROBOT_ENTITY_TYPE`.
 - **entity_id** (optional argument, required value): Unique identifier for the entity. If not passed, uses `DATAROBOT_ENTITY_ID`.
 - **api_key** (optional argument, required value): API key for authentication. If not passed, uses `DATAROBOT_API_TOKEN`.
 - **log_level** (optional): Logging level for the integration (default: `logging.INFO`)
@@ -111,6 +114,58 @@ with tracer.start_as_current_span("my-operation") as span:
 meter = metrics.get_meter(__name__)
 counter = meter.create_counter("my.counter")
 counter.add(1)
+```
+
+## How to use FastAPI instrumentation
+
+`datarobot_opentelemetry.instrumentations.fastapi` layers FastAPI/httpx/requests/SQLAlchemy
+auto-instrumentation and redacted log export on top of `configure()`, instead of
+re-implementing provider setup. `configure()` remains the single place that builds
+Trace/Log/Metric providers; this module adds what's specific to FastAPI applications.
+
+### Basic setup
+
+```python
+from fastapi import FastAPI
+
+from datarobot_opentelemetry.enums import EntityType
+from datarobot_opentelemetry.instrumentations.fastapi import OTel
+
+otel = OTel(entity_type=EntityType.CUSTOM_APPLICATION, entity_id="your-entity-id")
+
+# config only needs otel_exporter_otlp_endpoint / otel_exporter_otlp_headers /
+# otel_sdk_disabled attributes - any app Settings/Config class works, no inheritance required
+result = otel.configure(config)
+
+app = FastAPI()
+otel.instrument_fastapi_app(app)
+```
+
+### Available methods
+
+- **configure(config)**: applies OTel settings from app config. Call once during startup; a
+  second call is a no-op.
+- **instrument_fastapi_app(app)**: adds FastAPI/httpx/requests/SQLAlchemy auto-instrumentation.
+- **trace** / **meter** / **meter_and_trace**: decorators for tracing and recording call-count
+  metrics on a function.
+- **span(name)** / **time(name)**: context managers for a manual span or a duration metric.
+- **get_logger(name)** / **get_tracer(name)** / **get_meter(name)**: pass-through accessors for
+  the configured providers.
+- **log_application_start(application_name)**: logs a structured startup line.
+- **shutdown()**: flushes and shuts down the configured providers.
+
+`OTel` is a singleton, since only one set of providers can be configured per process.
+
+## How to use uvicorn logging
+
+`datarobot_opentelemetry.instrumentations.uvicorn` routes uvicorn's access/error loggers
+through the same formatters and redaction as the rest of the app, and filters out health
+check request noise.
+
+```python
+from datarobot_opentelemetry.instrumentations.uvicorn import configure_uvicorn_logging
+
+configure_uvicorn_logging(log_format="json", log_level="INFO")
 ```
 
 ## Requirements

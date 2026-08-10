@@ -7,7 +7,9 @@
 ## Architecture
 - This repository contains a Python package that provides:
   - semantic conventions in `src/datarobot_opentelemetry/semconv`
-  - optional OpenTelemetry integration helpers in `src/datarobot_opentelemetry/integrations`
+  - DataRobot-platform OTel setup (`configure()`) in `src/datarobot_opentelemetry/integrations`
+  - third-party framework instrumentation (FastAPI, uvicorn) built on top of `configure()`
+    in `src/datarobot_opentelemetry/instrumentations`
 - Keep public APIs stable and prefer additive changes.
 
 ## Build And Test

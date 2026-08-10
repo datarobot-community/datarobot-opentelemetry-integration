@@ -3,3 +3,12 @@
 
 # Default owners for everything in the repo.
 * @datarobot-oss/mmm
+
+# FastAPI/uvicorn instrumentation and the logging module it builds on: applications
+# co-owns these, since af-component-fastapi-backend and the app templates built on
+# it are the primary consumers.
+/python/datarobot-opentelemetry/src/datarobot_opentelemetry/instrumentations/  @datarobot-oss/mmm @datarobot/applications
+/python/datarobot-opentelemetry/src/datarobot_opentelemetry/logging.py         @datarobot-oss/mmm @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_instrumentations_fastapi.py    @datarobot-oss/mmm @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_instrumentations_uvicorn.py    @datarobot-oss/mmm @datarobot/applications
+/python/datarobot-opentelemetry/tests/unit/test_logging.py                     @datarobot-oss/mmm @datarobot/applications
