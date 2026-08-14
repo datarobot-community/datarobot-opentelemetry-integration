@@ -32,29 +32,26 @@ import inspect
 import logging
 import os
 import time
-from collections.abc import AsyncGenerator
-from collections.abc import Coroutine
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Callable, Coroutine, Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Callable
-from typing import Optional
-from typing import ParamSpec
-from typing import Protocol
-from typing import TypeVar
-from typing import no_type_check
-from typing import overload
+from types import TracebackType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ParamSpec,
+    Protocol,
+    TypeVar,
+    no_type_check,
+    overload,
+)
 
-from opentelemetry import context
-from opentelemetry import metrics
-from opentelemetry import trace
+from opentelemetry import context, metrics, trace
 from opentelemetry._logs import get_logger_provider
-from opentelemetry.trace import Span
 from opentelemetry.instrumentation.logging.handler import (
     LoggingHandler as _InstrumentationLoggingHandler,
 )
 from opentelemetry.sdk._logs import LoggingHandler as _SDKLoggingHandler
+from opentelemetry.trace import Span
 
 from datarobot_opentelemetry.enums import EntityType
 from datarobot_opentelemetry.integrations.configuration import ConfigureResult
@@ -164,7 +161,7 @@ class OTLPConnectionErrorFilter(logging.Filter):
     suppresses the rest.
     """
 
-    def __init__(self, warning_callback: Optional[Callable[[], None]] = None):
+    def __init__(self, warning_callback: Callable[[], None] | None = None):
         super().__init__()
         self.warning_callback = warning_callback
 
@@ -196,20 +193,20 @@ class OTLPConnectionErrorFilter(logging.Filter):
             not should_suppress
             and record.name.startswith("opentelemetry.sdk.")
             and record.levelno == logging.ERROR
+            and record.exc_info
         ):
-            if record.exc_info:
-                exc = record.exc_info[1]
-                seen: set[int] = set()
-                while exc is not None and id(exc) not in seen:
-                    if type(exc).__name__ in (
-                        "ConnectionError",
-                        "NewConnectionError",
-                        "MaxRetryError",
-                    ):
-                        should_suppress = True
-                        break
-                    seen.add(id(exc))
-                    exc = exc.__cause__ or exc.__context__
+            exc = record.exc_info[1]
+            seen: set[int] = set()
+            while exc is not None and id(exc) not in seen:
+                if type(exc).__name__ in (
+                    "ConnectionError",
+                    "NewConnectionError",
+                    "MaxRetryError",
+                ):
+                    should_suppress = True
+                    break
+                seen.add(id(exc))
+                exc = exc.__cause__ or exc.__context__
 
         if should_suppress:
             if self.warning_callback:
@@ -253,15 +250,15 @@ class OTel:
     auto-instrumentation and redacted log export on top.
     """
 
-    _instance: "OTel | None" = None
+    _instance: OTel | None = None
     _initialized: bool = False
     _auto_instrumentation_setup: bool = False
 
-    def __new__(
+    def __new__(  # noqa: PYI034
         cls,
         entity_type: EntityType | str = EntityType.CUSTOM_APPLICATION,
-        entity_id: Optional[str] = None,
-    ) -> "OTel":
+        entity_id: str | None = None,
+    ) -> OTel:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -269,7 +266,7 @@ class OTel:
     def __init__(
         self,
         entity_type: EntityType | str = EntityType.CUSTOM_APPLICATION,
-        entity_id: Optional[str] = None,
+        entity_id: str | None = None,
     ):
         if self._initialized:
             return
@@ -281,7 +278,8 @@ class OTel:
         self._configured = False
         self._startup_logged = False
         self._otlp_warning_logged = False
-        self._result: Optional[ConfigureResult] = None
+        self._result: ConfigureResult | None = None
+        self._function_histograms: dict[str, metrics.Histogram] = {}
 
         self._install_otlp_error_filter()
 
@@ -389,7 +387,7 @@ class OTel:
             try:
                 RequestsInstrumentor().instrument()
                 logger.info("Auto-instrumentation enabled for requests library")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to setup requests auto-instrumentation: {e}")
         else:
             logger.warning(
@@ -401,17 +399,17 @@ class OTel:
             try:
                 HTTPXClientInstrumentor().instrument()
                 logger.info("Auto-instrumentation enabled for httpx library")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to setup httpx auto-instrumentation: {e}")
 
         if SQLAlchemyInstrumentor is not None:
             try:
                 SQLAlchemyInstrumentor().instrument()
                 logger.info("Auto-instrumentation enabled for SQLAlchemy")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to setup SQLAlchemy auto-instrumentation: {e}")
 
-    def instrument_fastapi_app(self, app: "FastAPI") -> None:
+    def instrument_fastapi_app(self, app: FastAPI) -> None:
         """
         Instrument a FastAPI application for automatic tracing.
 
@@ -431,7 +429,7 @@ class OTel:
                 exclude_spans=["send", "receive"],
             )
             logger.info("Auto-instrumentation enabled for FastAPI application")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to instrument FastAPI app: {e}")
 
     def get_logger(self, name: str) -> logging.Logger:
@@ -494,38 +492,43 @@ class OTel:
             },
         )
 
-    def __enter__(self) -> "OTel":
+    def __enter__(self) -> OTel:  # noqa: PYI034
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.shutdown()
 
     @overload
     def trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Coroutine[T, None, None]],
     ) -> Callable[P, Coroutine[T, None, None]]: ...
 
     @overload
     def trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, AsyncGenerator[T, None]],
     ) -> Callable[P, AsyncGenerator[T, None]]: ...
 
     @overload
     def trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Generator[T, None, None]],
     ) -> Callable[P, Generator[T, None, None]]: ...
 
     @overload
-    def trace(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+    def trace(self: OTel, func: Callable[P, T]) -> Callable[P, T]: ...
 
     @overload
-    def trace(self: "OTel", name: str) -> Callable[[Any], Any]: ...
+    def trace(self: OTel, name: str) -> Callable[[Any], Any]: ...
 
     @no_type_check
-    def trace(self: "OTel", func: Any) -> Any:
+    def trace(self: OTel, func: Any) -> Any:
         """
         Wrap the execution of the decorated function in an OTel span.
 
@@ -546,9 +549,7 @@ class OTel:
         return self._trace_with_name(func)
 
     @no_type_check
-    def _trace_with_name(
-        self: "OTel", func: Any, span_name: Optional[str] = None
-    ) -> Any:
+    def _trace_with_name(self: OTel, func: Any, span_name: str | None = None) -> Any:
         name = span_name or f"{func.__module__}.{func.__qualname__}"
 
         if self._is_trace_span_excluded(name):
@@ -578,8 +579,7 @@ class OTel:
             @functools.wraps(func)
             def inner_gen(*args, **kwargs):
                 with tracer.start_as_current_span(name):
-                    for x in func(*args, **kwargs):
-                        yield x
+                    yield from func(*args, **kwargs)
 
             return inner_gen
         elif inspect.isfunction(func):
@@ -595,12 +595,15 @@ class OTel:
                 f"instrument can only decorate a function type, while {name} is a {type(func)}."
             )
 
-    @functools.cache
-    def _function_histogram(self: "OTel", name: str) -> metrics.Histogram:
-        meter = self.get_meter("application-meter")
-        return meter.create_histogram(
-            f"function.{name}", "s", "A histogram recording function timings."
-        )
+    def _function_histogram(self: OTel, name: str) -> metrics.Histogram:
+        histogram = self._function_histograms.get(name)
+        if histogram is None:
+            meter = self.get_meter("application-meter")
+            histogram = meter.create_histogram(
+                f"function.{name}", "s", "A histogram recording function timings."
+            )
+            self._function_histograms[name] = histogram
+        return histogram
 
     @contextmanager
     def span(self, name: str, **attributes: Any) -> Generator[Span, None, None]:
@@ -636,27 +639,27 @@ class OTel:
 
     @overload
     def meter(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Coroutine[T, None, None]],
     ) -> Callable[P, Coroutine[T, None, None]]: ...
 
     @overload
     def meter(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, AsyncGenerator[T, None]],
     ) -> Callable[P, AsyncGenerator[T, None]]: ...
 
     @overload
     def meter(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Generator[T, None, None]],
     ) -> Callable[P, Generator[T, None, None]]: ...
 
     @overload
-    def meter(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+    def meter(self: OTel, func: Callable[P, T]) -> Callable[P, T]: ...
 
     @no_type_check
-    def meter(self: "OTel", func: Any) -> Any:
+    def meter(self: OTel, func: Any) -> Any:
         """
         Wrap the execution of the decorated function in a timing histogram sharing
         the function's own name.
@@ -689,8 +692,7 @@ class OTel:
             @functools.wraps(func)
             def inner_gen(*args, **kwargs):
                 with self.time(span_name):
-                    for x in func(*args, **kwargs):
-                        yield x
+                    yield from func(*args, **kwargs)
 
             return inner_gen
         elif inspect.isfunction(func):
@@ -708,26 +710,26 @@ class OTel:
 
     @overload
     def meter_and_trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Coroutine[T, None, None]],
     ) -> Callable[P, Coroutine[T, None, None]]: ...
 
     @overload
     def meter_and_trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, AsyncGenerator[T, None]],
     ) -> Callable[P, AsyncGenerator[T, None]]: ...
 
     @overload
     def meter_and_trace(
-        self: "OTel",
+        self: OTel,
         func: Callable[P, Generator[T, None, None]],
     ) -> Callable[P, Generator[T, None, None]]: ...
 
     @overload
-    def meter_and_trace(self: "OTel", func: Callable[P, T]) -> Callable[P, T]: ...
+    def meter_and_trace(self: OTel, func: Callable[P, T]) -> Callable[P, T]: ...
 
     @no_type_check
-    def meter_and_trace(self: "OTel", func: Any) -> Any:
+    def meter_and_trace(self: OTel, func: Any) -> Any:
         """Apply both `meter` and `trace` to the decorated function."""
         return functools.wraps(func)(self.meter(self.trace(func)))

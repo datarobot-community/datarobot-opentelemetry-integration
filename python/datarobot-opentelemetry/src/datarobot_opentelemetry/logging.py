@@ -17,18 +17,13 @@ import re
 import sys
 import time
 import traceback
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
 from functools import wraps
 from typing import (
     Any,
-    Callable,
-    Coroutine,
-    Dict,
-    List,
     ParamSpec,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 from datarobot_opentelemetry.enums import FormatType, LogLevel
@@ -79,9 +74,7 @@ class JsonFormatter(logging.Formatter):
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
-        self.default_fields: Dict[
-            str, Union[Callable[[logging.LogRecord], Any], Any]
-        ] = {
+        self.default_fields: dict[str, Callable[[logging.LogRecord], Any] | Any] = {
             "timestamp": lambda _: datetime.now(timezone.utc).isoformat(),
             # The Chronosphere OTel collector's node daemonset only extracts severity
             # from JSON logs when this key is exactly "levelname" (severity_parser
@@ -122,7 +115,7 @@ class JsonFormatter(logging.Formatter):
                 json.dumps(value, default=str)
                 log_data[key] = value
             except ValueError as e:
-                log_data[key] = f"<serialization error: {str(e)}>"
+                log_data[key] = f"<serialization error: {e!s}>"
 
         return json.dumps(log_data, ensure_ascii=False, default=str)
 
@@ -196,12 +189,12 @@ class TextFormatter(logging.Formatter):
         return _indent_bare_continuation_lines(message)
 
 
-SENSITIVE_LOG_KEYS: List[str] = ["access_token", "refresh_token", "api_key"]
+SENSITIVE_LOG_KEYS: list[str] = ["access_token", "refresh_token", "api_key"]
 
 
 def _build_key_value_patterns(
-    sensitive_keys: List[str],
-) -> List[Tuple[str, "re.Pattern[str]"]]:
+    sensitive_keys: list[str],
+) -> list[tuple[str, "re.Pattern[str]"]]:
     """Build `key=value` regexes for catching secrets embedded in free text."""
     return [
         (key, re.compile(rf"{re.escape(key)}=(['\"]?)([^'\"\s,)}}]+)\1", re.IGNORECASE))
@@ -212,7 +205,7 @@ def _build_key_value_patterns(
 _SENSITIVE_KEY_VALUE_PATTERNS = _build_key_value_patterns(SENSITIVE_LOG_KEYS)
 
 
-def _redact_string(value: str, sensitive_keys: List[str]) -> str:
+def _redact_string(value: str, sensitive_keys: list[str]) -> str:
     patterns = (
         _SENSITIVE_KEY_VALUE_PATTERNS
         if sensitive_keys is SENSITIVE_LOG_KEYS
@@ -223,7 +216,7 @@ def _redact_string(value: str, sensitive_keys: List[str]) -> str:
     return value
 
 
-def redact_value(obj: Any, sensitive_keys: List[str] = SENSITIVE_LOG_KEYS) -> Any:
+def redact_value(obj: Any, sensitive_keys: list[str] = SENSITIVE_LOG_KEYS) -> Any:
     """
     Recursively redact sensitive information from dictionaries, objects, and free-text
     strings (e.g. an exception message containing "api_key=secret" as plain text, not
@@ -253,8 +246,8 @@ def redact_value(obj: Any, sensitive_keys: List[str] = SENSITIVE_LOG_KEYS) -> An
 
 
 def redact_attributes(
-    attributes: Dict[str, Any], sensitive_keys: List[str] = SENSITIVE_LOG_KEYS
-) -> Dict[str, Any]:
+    attributes: dict[str, Any], sensitive_keys: list[str] = SENSITIVE_LOG_KEYS
+) -> dict[str, Any]:
     """Redact a flat mapping (e.g. OTel log record attributes), including top-level keys.
 
     Unlike `redact_value`, which only redacts keys nested *inside* a dict/object value,
@@ -270,7 +263,7 @@ def redact_attributes(
 class RedactingFormatter(logging.Formatter):
     """Wraps another formatter to redact sensitive values from log output."""
 
-    sensitive_keys: List[str] = SENSITIVE_LOG_KEYS
+    sensitive_keys: list[str] = SENSITIVE_LOG_KEYS
 
     def __init__(self, original_formatter: logging.Formatter):
         super().__init__()
@@ -333,7 +326,7 @@ def init_logging(
 
 def get_logger(
     name: str = "",
-    level: Union[LogLevel, str] = LogLevel.INFO,
+    level: LogLevel | str = LogLevel.INFO,
     stream: Any = sys.stdout,
     format_type: FormatType = "text",
 ) -> logging.Logger:
@@ -380,7 +373,7 @@ def log_api_call(
 
     @wraps(func)
     async def wrapper(*args: "P.args", **kwargs: "P.kwargs") -> T:
-        request_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        request_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         separator = f"\n{'=' * 80}\n"
         logger.info(
             f"{separator}API CALL START: {func.__name__} [{request_id}]{separator}"
@@ -397,10 +390,10 @@ def log_api_call(
                 "------------------------\n"
                 f"Function: {func.__name__}\n"
                 f"Error Type: {type(e).__name__}\n"
-                f"Error Message: {str(e)}\n\n"
+                f"Error Message: {e!s}\n\n"
                 "Stack Trace:\n"
             )
-            logger.error(error_log, exc_info=True)
+            logger.exception(error_log)
             raise
 
     return wrapper
