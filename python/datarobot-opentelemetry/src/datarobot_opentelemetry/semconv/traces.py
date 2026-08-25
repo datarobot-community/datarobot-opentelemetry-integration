@@ -28,6 +28,7 @@ class SpanAttributes:
     GEN_AI_USAGE_INPUT_TOKENS: Final = "gen_ai.usage.input_tokens"
     GEN_AI_USAGE_OUTPUT_TOKENS: Final = "gen_ai.usage.output_tokens"
     GEN_AI_TOOL_NAME: Final = "gen_ai.tool.name"
+    GEN_AI_AGENT_NAME: Final = "gen_ai.agent.name"
     ERROR_TYPE: Final = "error.type"
     SERVER_ADDRESS: Final = "server.address"
     SERVER_PORT: Final = "server.port"

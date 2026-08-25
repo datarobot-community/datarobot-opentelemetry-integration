@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-08-24
+
+### Added
+
+- `SpanAttributes.GEN_AI_AGENT_NAME` (`gen_ai.agent.name`), the OTel GenAI semantic
+  convention attribute for identifying the agent that produced a span.
+
 ## [0.3.0] - 2026-07-20
 
 ### Added
