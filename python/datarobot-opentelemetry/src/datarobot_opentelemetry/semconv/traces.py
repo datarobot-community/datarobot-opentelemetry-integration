@@ -60,6 +60,10 @@ class SpanAttributes:
         "gen_ai.usage.cache_creation.input_tokens"
     )
     GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: Final = "gen_ai.usage.cache_read.input_tokens"
+    GEN_AI_EVALUATION_NAME: Final = "gen_ai.evaluation.name"
+    GEN_AI_EVALUATION_SCORE_LABEL: Final = "gen_ai.evaluation.score.label"
+    GEN_AI_EVALUATION_SCORE_VALUE: Final = "gen_ai.evaluation.score.value"
+    GEN_AI_EVALUATION_EXPLANATION: Final = "gen_ai.evaluation.explanation"
 
     # DataRobot specific attributes
     DATAROBOT_TRACE_NAME: Final = "datarobot.trace_name"
@@ -75,3 +79,4 @@ class SpanAttributes:
     DATAROBOT_GUARDRAILS_LABELS: Final = "datarobot.guardrails.labels"
     DATAROBOT_GUARDRAILS_ACTIONS: Final = "datarobot.guardrails.actions"
     DATAROBOT_MODERATION_COST: Final = "datarobot.moderation.cost"
+    DATAROBOT_SPAN_KIND: Final = "datarobot.span.kind"

@@ -48,3 +48,12 @@ class EntityType(str, Enum):
     # the X-DataRobot-Entity-Id header and service.name built from it.
     __str__ = str.__str__
     __format__ = str.__format__  # type: ignore[assignment]
+
+
+class DataRobotSpanKind(str, Enum):
+    """Known DataRobot span kinds observable via the OTel API."""
+
+    EVALUATOR = "evaluator"
+
+    __str__ = str.__str__
+    __format__ = str.__format__  # type: ignore[assignment]
