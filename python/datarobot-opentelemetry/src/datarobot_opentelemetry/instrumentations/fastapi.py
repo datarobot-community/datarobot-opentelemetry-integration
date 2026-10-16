@@ -128,7 +128,7 @@ class _SafeLoggingHandler(_SDKLoggingHandler):
     @staticmethod
     def _get_attributes(record: logging.LogRecord) -> dict[str, Any]:
         attributes = _SDKLoggingHandler._get_attributes(record)
-        return redact_attributes(dict(attributes))
+        return redact_attributes(dict(attributes or {}))
 
     def emit(self, record: logging.LogRecord) -> None:
         if _otel_handler_active.get():
